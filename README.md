@@ -28,7 +28,7 @@ Neo COBOL
   └─> Native Neo COBOL compiler pipeline
 ```
 
-The exact compatibility level and lowering rules will be defined in `SPECIFICATION.md`.
+The exact compatibility level and lowering rules will be defined in `docs/language/SPECIFICATION.md`.
 
 ## Project status
 
@@ -36,7 +36,8 @@ Early design phase. Syntax, type system, module model, compatibility rules, and 
 
 See:
 
-- `SPECIFICATION.md` — language specification draft
+- `docs/language/SPECIFICATION.md` — language specification draft
+- `docs/language/GRAMMAR.md` — grammar and EBNF draft
 - `ROADMAP.md` — implementation roadmap
 - GitHub Issues — individual design and implementation tasks
 
