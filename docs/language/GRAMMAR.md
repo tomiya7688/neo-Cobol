@@ -35,13 +35,51 @@ A formatter may choose a canonical keyword style, but source spelling is not sem
 
 ### 2.2 Identifiers
 
-The initial identifier form follows conventional COBOL naming style.
+Neo COBOL identifiers preserve conventional COBOL hyphenated naming and additionally allow underscores.
 
-```ebnf
-identifier = letter, { letter | digit | "-" | "_" } ;
+An identifier:
+
+- must contain at least one letter,
+- may contain letters, digits, hyphens (`-`), and underscores (`_`),
+- must not begin with `-` or `_`,
+- must not end with `-` or `_`,
+- must not consist only of digits,
+- is case-insensitive.
+
+Examples of valid identifiers:
+
+```text
+CUSTOMER-NAME
+customer_name
+CUSTOMER-01
+GET_CUSTOMER-NAME
+A1
 ```
 
-Further restrictions, reserved words, maximum lengths, and Unicode policy remain to be specified.
+Examples of invalid identifiers:
+
+```text
+-CUSTOMER
+_CUSTOMER
+CUSTOMER-
+CUSTOMER_
+12345
+```
+
+Preliminary lexical form:
+
+```ebnf
+identifier = identifier-start,
+             { identifier-middle },
+             identifier-end
+           | letter ;
+
+identifier-start = letter | digit ;
+identifier-middle = letter | digit | "-" | "_" ;
+identifier-end = letter | digit ;
+```
+
+The additional semantic constraint applies that the complete identifier must contain at least one letter. Reserved words, maximum identifier length, and Unicode identifier policy remain to be specified.
 
 ### 2.3 Sentence terminator
 
