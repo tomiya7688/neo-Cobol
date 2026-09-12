@@ -16,7 +16,7 @@ This document defines the grammar direction of Neo COBOL. Neo COBOL is intention
 8. `CLASS`, `METHOD`, and `FUNCTION` facilities follow COBOL 2002 style as closely as practical, with optional Neo COBOL shorthand.
 9. Error-handling phrases use COBOL-style forms such as `ON ERROR` and `ON EXCEPTION` rather than introducing unrelated exception syntax.
 10. When Neo shorthand can be expanded mechanically into standard COBOL-like structure, that expansion defines its intended meaning.
-11. Neo COBOL extends the COBOL 2002 object model with modern access control, inheritance, interfaces, static members, and namespaces.
+11. Neo COBOL extends the COBOL 2002 object model with modern access control, inheritance, interfaces, static members, namespaces, and first-class functions.
 
 ## 2. Lexical rules
 
@@ -404,9 +404,69 @@ class-definition = { class-modifier }, "CLASS", identifier,
 
 Traditional COBOL 2002 forms such as `CLASS-ID.` and `METHOD-ID.` remain valid where supported; Neo forms normalize to the same internal representation.
 
-## 10. Functions
+## 10. Functions and anonymous functions
 
-Functions remain based on COBOL 2002 concepts and use explicit English-oriented parameter and return clauses.
+Named functions remain based on COBOL 2002 concepts and use explicit English-oriented parameter and return clauses.
+
+Neo COBOL also supports first-class anonymous functions. The anonymous form deliberately reuses the `FUNCTION ... END FUNCTION` structure instead of introducing a symbolic lambda operator.
+
+```cobol
+FUNCTION USING X
+    RETURN X + 1
+END FUNCTION
+```
+
+The absence of a function name distinguishes an anonymous function expression from a named function definition.
+
+Preliminary grammar:
+
+```ebnf
+anonymous-function = "FUNCTION",
+                     [ "USING", identifier, { identifier } ],
+                     [ "RETURNING", type-reference ],
+                     statement-list,
+                     "END", "FUNCTION" ;
+```
+
+Anonymous functions are expressions and may be stored, passed as arguments, returned from functions, or otherwise used where a compatible function type is expected.
+
+Example assignment direction:
+
+```cobol
+MOVE FUNCTION USING X
+         RETURN X + 1
+     END FUNCTION
+TO INCREMENT.
+```
+
+A named binding form may also be supported by declarations or other syntax defined by the type-system specification; the core callable value remains the anonymous `FUNCTION` expression.
+
+### 10.1 Function types
+
+Neo COBOL has function-reference types so anonymous and named functions can be treated as values. Exact declaration syntax, parameter variance, return-type compatibility, and overload interaction are part of the type-system specification.
+
+A function value may be `NULL` where nullable function references are permitted.
+
+### 10.2 Closures
+
+Anonymous functions may capture variables from an enclosing lexical scope.
+
+```cobol
+01 LIMIT PIC 9(3) VALUE 100.
+
+MOVE FUNCTION USING VALUE
+         RETURN VALUE IS GREATER THAN LIMIT
+     END FUNCTION
+TO IS-LARGE.
+```
+
+Here `LIMIT` is captured from the surrounding scope.
+
+The compiler and runtime must preserve captured values for as long as the closure remains reachable. Exact capture mode rules, mutability rules, storage lifetime, and lowering strategy are part of the type-system/runtime specification.
+
+### 10.3 Compatibility goal
+
+Anonymous functions and closures are Neo COBOL extensions. When targeting traditional COBOL, they may be lowered to generated named procedures/functions plus compiler-managed environment data when a faithful translation is possible.
 
 ## 11. Division inference
 
@@ -447,6 +507,8 @@ The following remain to be specified:
 - Detailed inheritance, casting, and interface conversion rules
 - Interface property/event/default-method policy
 - Namespace import/use syntax
+- Exact function-reference type declaration syntax
+- Closure capture mode and mutability rules
 - Generic or parameterized facilities, if any
 - `COMPUTE`
 - `CALL`
