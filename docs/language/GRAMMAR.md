@@ -110,6 +110,116 @@ comment = "*>", { any-character-except-line-terminator } ;
 
 Neo COBOL does not introduce `//` or `/* ... */` as canonical comment syntax.
 
+### 2.5 Literals
+
+Neo COBOL keeps ordinary COBOL literal forms and adds explicit modern literals where useful.
+
+#### 2.5.1 Character strings
+
+Single-quoted and double-quoted character-string literals are both accepted.
+
+```cobol
+DISPLAY "HELLO".
+DISPLAY 'HELLO'.
+```
+
+A quote character matching the delimiter is represented by doubling it.
+
+```cobol
+DISPLAY "He said ""HELLO"".".
+DISPLAY 'It''s fine.'.
+```
+
+#### 2.5.2 Decimal numbers
+
+Signed and unsigned integer and decimal literals are accepted.
+
+```text
+0
+123
+-123
++123
+12.34
+-0.5
++10.0
+```
+
+A sign belongs to the numeric literal when it appears directly before the number in a context where a literal is expected.
+
+#### 2.5.3 Exponential notation
+
+Neo COBOL supports decimal scientific notation using `E` or `e`.
+
+```text
+1E3
+1.25E6
+-2.5e-4
++6E+10
+```
+
+The exponent is decimal and may have an optional sign.
+
+#### 2.5.4 Based integer notation
+
+Neo COBOL provides explicit binary, octal, and hexadecimal integer literals.
+
+```text
+0b1010
+0B1010
+0o755
+0O755
+0xFF
+0XFF
+```
+
+The prefixes are case-insensitive. These are Neo COBOL extensions and may require generated support code or translation when down-compiling to COBOL dialects that do not provide an equivalent source notation.
+
+#### 2.5.5 Boolean literals
+
+Neo COBOL defines the Boolean literals:
+
+```text
+TRUE
+FALSE
+```
+
+They are case-insensitive keywords and produce values of the Boolean type.
+
+#### 2.5.6 Null literal
+
+Neo COBOL defines:
+
+```text
+NULL
+```
+
+as the null literal. `NULL` is case-insensitive.
+
+The exact set of types that may contain `NULL`, null-conversion rules, and null-safety diagnostics are part of the type-system specification rather than the lexical grammar.
+
+A preliminary literal grammar is:
+
+```ebnf
+literal = string-literal
+        | numeric-literal
+        | boolean-literal
+        | null-literal ;
+
+boolean-literal = "TRUE" | "FALSE" ;
+null-literal = "NULL" ;
+
+numeric-literal = [ sign ],
+                  ( decimal-number
+                  | exponential-number
+                  | binary-integer
+                  | octal-integer
+                  | hexadecimal-integer ) ;
+
+sign = "+" | "-" ;
+```
+
+Exact digit-separator rules, locale-dependent decimal conventions, and legacy COBOL numeric literal edge cases remain to be specified.
+
 ## 3. Program structure
 
 Traditional COBOL divisions remain valid:
@@ -389,7 +499,6 @@ The following remain to be specified:
 
 - Exact period-omission boundary rules
 - Full lexical grammar and reserved-word set
-- Literal syntax
 - Numeric and data-description grammar
 - `PIC` and modern type syntax, if any
 - `COMPUTE`
