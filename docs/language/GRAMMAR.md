@@ -16,7 +16,7 @@ This document defines the grammar direction of Neo COBOL. Neo COBOL is intention
 8. `CLASS`, `METHOD`, and `FUNCTION` facilities follow COBOL 2002 style as closely as practical, with optional Neo COBOL shorthand.
 9. Error-handling phrases use COBOL-style forms such as `ON ERROR` and `ON EXCEPTION` rather than introducing unrelated exception syntax.
 10. When Neo shorthand can be expanded mechanically into standard COBOL-like structure, that expansion defines its intended meaning.
-11. Neo COBOL extends the COBOL 2002 object model with modern access control, inheritance modifiers, static members, and namespaces.
+11. Neo COBOL extends the COBOL 2002 object model with modern access control, inheritance, interfaces, static members, and namespaces.
 
 ## 2. Lexical rules
 
@@ -224,19 +224,7 @@ END METHOD.
 END CLASS CUSTOMER.
 ```
 
-Section-oriented grouping may also be supported for a more COBOL-like style:
-
-```cobol
-PUBLIC SECTION.
-    METHOD GET-NAME
-    END METHOD.
-
-PRIVATE SECTION.
-    METHOD CALCULATE-INTERNAL
-    END METHOD.
-```
-
-The exact interaction between section visibility and per-member modifiers remains to be finalized.
+Section-oriented grouping may also be supported for a more COBOL-like style.
 
 ### 9.3 STATIC
 
@@ -250,7 +238,7 @@ PUBLIC STATIC METHOD CREATE-DEFAULT
 END METHOD.
 ```
 
-### 9.4 Inheritance
+### 9.4 Class inheritance
 
 Neo COBOL uses `INHERITS` for class inheritance.
 
@@ -260,9 +248,71 @@ PUBLIC CLASS EMPLOYEE INHERITS PERSON.
 END CLASS EMPLOYEE.
 ```
 
-A derived-class reference is assignment-compatible with an accessible base-class reference subject to the type-system rules.
+The initial object model uses single class inheritance: a class may directly inherit from at most one base class.
 
-### 9.5 ABSTRACT
+A derived-class reference is assignment-compatible with an accessible base-class reference subject to the type-system rules. Down-casts require an explicit conversion mechanism to be specified separately.
+
+A `SEALED` class cannot be used as a base class.
+
+### 9.5 Interfaces
+
+Neo COBOL supports interfaces as an explicit contract mechanism. Interfaces are intentionally narrower than classes: they define capabilities and member contracts rather than object state.
+
+```cobol
+PUBLIC INTERFACE PRINTABLE.
+
+PUBLIC METHOD PRINT
+END METHOD.
+
+END INTERFACE PRINTABLE.
+```
+
+An interface may declare method signatures and other contract members defined by the type-system specification, but it does not contain normal instance data fields.
+
+A class implements one or more interfaces with `IMPLEMENTS`:
+
+```cobol
+PUBLIC CLASS REPORT IMPLEMENTS PRINTABLE.
+
+PUBLIC METHOD PRINT
+    DISPLAY "REPORT"
+END METHOD.
+
+END CLASS REPORT.
+```
+
+Multiple interfaces may be implemented:
+
+```cobol
+PUBLIC CLASS REPORT
+    INHERITS DOCUMENT
+    IMPLEMENTS PRINTABLE SERIALIZABLE AUDITABLE.
+
+END CLASS REPORT.
+```
+
+This keeps class inheritance simple while allowing multiple independent contracts.
+
+Preliminary grammar:
+
+```ebnf
+interface-definition = { interface-modifier }, "INTERFACE", identifier,
+                       sentence-terminator,
+                       { interface-member },
+                       ( "END INTERFACE" | "END-INTERFACE" ),
+                       [ identifier ], sentence-terminator ;
+
+interface-modifier = access-modifier ;
+
+implements-clause = "IMPLEMENTS", qualified-name,
+                    { qualified-name } ;
+```
+
+Interface references are reference types and may refer to any live object whose class implements the interface. `NULL` is also valid where nullable references are permitted.
+
+Interfaces do not imply multiple class inheritance.
+
+### 9.6 ABSTRACT
 
 `ABSTRACT` may be applied to a class or method.
 
@@ -276,7 +326,7 @@ END METHOD.
 
 An abstract class cannot be instantiated directly. An abstract method has no concrete implementation in the declaring class and must be implemented by a non-abstract derived class unless another applicable rule is specified.
 
-### 9.6 OVERRIDE
+### 9.7 OVERRIDE
 
 `OVERRIDE` explicitly marks a method that overrides an inherited method.
 
@@ -286,9 +336,9 @@ PUBLIC OVERRIDE METHOD CALCULATE-AREA
 END METHOD.
 ```
 
-The compiler should diagnose an `OVERRIDE` method that does not match an overridable inherited member.
+The compiler must diagnose an `OVERRIDE` method that does not match an overridable inherited member.
 
-### 9.7 SEALED
+### 9.8 SEALED
 
 `SEALED` prevents further inheritance or overriding, depending on where it is applied.
 
@@ -298,19 +348,13 @@ PUBLIC SEALED CLASS CUSTOMER.
 END CLASS CUSTOMER.
 ```
 
-A sealed class cannot be inherited.
-
 ```cobol
 PUBLIC SEALED OVERRIDE METHOD VALIDATE
     ...
 END METHOD.
 ```
 
-A sealed method may not be overridden by further derived classes.
-
-### 9.8 Modifier combinations
-
-Preliminary modifier sets are:
+### 9.9 Modifier combinations
 
 ```ebnf
 access-modifier = "PUBLIC" | "PRIVATE" | "PROTECTED" ;
@@ -320,9 +364,9 @@ member-modifier = access-modifier | "STATIC" | "ABSTRACT" | "OVERRIDE" | "SEALED
 
 Illegal combinations such as `ABSTRACT SEALED CLASS` must be rejected unless explicitly defined otherwise in the type-system specification.
 
-### 9.9 Namespace
+### 9.10 Namespace
 
-Neo COBOL provides namespaces for organizing classes, functions, and other public program elements.
+Neo COBOL provides namespaces for organizing classes, interfaces, functions, and other public program elements.
 
 ```cobol
 NAMESPACE COMPANY.CUSTOMER
@@ -346,11 +390,12 @@ qualified-name = identifier, { ".", identifier } ;
 
 The exact import/use syntax for accessing members of another namespace remains to be specified.
 
-### 9.10 Preliminary class grammar
+### 9.11 Preliminary class grammar
 
 ```ebnf
 class-definition = { class-modifier }, "CLASS", identifier,
                    [ "INHERITS", qualified-name ],
+                   [ implements-clause ],
                    sentence-terminator,
                    { class-member },
                    ( "END CLASS" | "END-CLASS" ),
@@ -365,7 +410,7 @@ Functions remain based on COBOL 2002 concepts and use explicit English-oriented 
 
 ## 11. Division inference
 
-When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis. Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division. Top-level `CLASS`, `FUNCTION`, and `NAMESPACE` constructs are recognized directly.
+When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis. Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division. Top-level `CLASS`, `INTERFACE`, `FUNCTION`, and `NAMESPACE` constructs are recognized directly.
 
 ## 12. Normalization model
 
@@ -399,9 +444,9 @@ The following remain to be specified:
 - Detailed class-type declaration rules
 - Constructor/initialization semantics
 - Object lifetime and destruction semantics
-- Detailed inheritance and conversion rules
+- Detailed inheritance, casting, and interface conversion rules
+- Interface property/event/default-method policy
 - Namespace import/use syntax
-- Interfaces, if supported
 - Generic or parameterized facilities, if any
 - `COMPUTE`
 - `CALL`
