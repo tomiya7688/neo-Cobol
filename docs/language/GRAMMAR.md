@@ -16,6 +16,7 @@ This document defines the grammar direction of Neo COBOL. Neo COBOL is intention
 8. `CLASS`, `METHOD`, and `FUNCTION` facilities follow COBOL 2002 style as closely as practical, with optional Neo COBOL shorthand.
 9. Error-handling phrases use COBOL-style forms such as `ON ERROR` and `ON EXCEPTION` rather than introducing unrelated exception syntax.
 10. When Neo shorthand can be expanded mechanically into standard COBOL-like structure, that expansion defines its intended meaning.
+11. Neo COBOL extends the COBOL 2002 object model with modern access control, inheritance modifiers, static members, and namespaces.
 
 ## 2. Lexical rules
 
@@ -114,111 +115,7 @@ Neo COBOL does not introduce `//` or `/* ... */` as canonical comment syntax.
 
 Neo COBOL keeps ordinary COBOL literal forms and adds explicit modern literals where useful.
 
-#### 2.5.1 Character strings
-
-Single-quoted and double-quoted character-string literals are both accepted.
-
-```cobol
-DISPLAY "HELLO".
-DISPLAY 'HELLO'.
-```
-
-A quote character matching the delimiter is represented by doubling it.
-
-```cobol
-DISPLAY "He said ""HELLO"".".
-DISPLAY 'It''s fine.'.
-```
-
-#### 2.5.2 Decimal numbers
-
-Signed and unsigned integer and decimal literals are accepted.
-
-```text
-0
-123
--123
-+123
-12.34
--0.5
-+10.0
-```
-
-A sign belongs to the numeric literal when it appears directly before the number in a context where a literal is expected.
-
-#### 2.5.3 Exponential notation
-
-Neo COBOL supports decimal scientific notation using `E` or `e`.
-
-```text
-1E3
-1.25E6
--2.5e-4
-+6E+10
-```
-
-The exponent is decimal and may have an optional sign.
-
-#### 2.5.4 Based integer notation
-
-Neo COBOL provides explicit binary, octal, and hexadecimal integer literals.
-
-```text
-0b1010
-0B1010
-0o755
-0O755
-0xFF
-0XFF
-```
-
-The prefixes are case-insensitive. These are Neo COBOL extensions and may require generated support code or translation when down-compiling to COBOL dialects that do not provide an equivalent source notation.
-
-#### 2.5.5 Boolean literals
-
-Neo COBOL defines the Boolean literals:
-
-```text
-TRUE
-FALSE
-```
-
-They are case-insensitive keywords and produce values of the Boolean type.
-
-#### 2.5.6 Null literal
-
-Neo COBOL defines:
-
-```text
-NULL
-```
-
-as the null literal. `NULL` is case-insensitive.
-
-The exact set of types that may contain `NULL`, null-conversion rules, and null-safety diagnostics are part of the type-system specification rather than the lexical grammar.
-
-A preliminary literal grammar is:
-
-```ebnf
-literal = string-literal
-        | numeric-literal
-        | boolean-literal
-        | null-literal ;
-
-boolean-literal = "TRUE" | "FALSE" ;
-null-literal = "NULL" ;
-
-numeric-literal = [ sign ],
-                  ( decimal-number
-                  | exponential-number
-                  | binary-integer
-                  | octal-integer
-                  | hexadecimal-integer ) ;
-
-sign = "+" | "-" ;
-```
-
-Exact digit-separator rules, locale-dependent decimal conventions, and legacy COBOL numeric literal edge cases remain to be specified.
+Single-quoted and double-quoted strings are accepted. Signed and unsigned decimal integers and decimals are accepted. Scientific notation uses `E` or `e`. Binary, octal, and hexadecimal integers use `0b`, `0o`, and `0x` prefixes. `TRUE`, `FALSE`, and `NULL` are built-in literals.
 
 ## 3. Program structure
 
@@ -232,70 +129,15 @@ PROCEDURE DIVISION.
 
 Neo COBOL permits inferable divisions to be omitted.
 
-For example:
-
-```cobol
-PROGRAM-ID. HELLO.
-
-01 NAME PIC X(20) VALUE "KADOKA".
-
-DISPLAY "HELLO " NAME.
-```
-
-is interpreted as if the omitted structure had been written explicitly:
-
-```cobol
-IDENTIFICATION DIVISION.
-PROGRAM-ID. HELLO.
-
-DATA DIVISION.
-WORKING-STORAGE SECTION.
-01 NAME PIC X(20) VALUE "KADOKA".
-
-PROCEDURE DIVISION.
-DISPLAY "HELLO " NAME.
-```
-
-The exact inference rules will be specified separately. Inference must be deterministic.
-
-A preliminary top-level grammar is:
-
-```ebnf
-program = [ identification-division ],
-          [ data-division ],
-          [ procedure-division ],
-          { class-definition | function-definition } ;
-```
-
 ## 4. Statements
 
 ### 4.1 MOVE
 
 `MOVE` is the canonical assignment statement.
 
-```ebnf
-move-statement = "MOVE", expression, "TO", identifier,
-                 { identifier }, sentence-terminator ;
-```
-
-Example:
-
-```cobol
-MOVE CUSTOMER-NAME TO DISPLAY-NAME.
-```
-
 ### 4.2 DISPLAY
 
-```ebnf
-display-statement = "DISPLAY", expression,
-                    { expression }, sentence-terminator ;
-```
-
-Example:
-
-```cobol
-DISPLAY "HELLO WORLD".
-```
+COBOL-style `DISPLAY` is retained.
 
 ### 4.3 CREATE
 
@@ -306,8 +148,6 @@ CREATE CUSTOMER AS CUSTOMER-OBJECT.
 CREATE CUSTOMER USING NAME AGE AS CUSTOMER-OBJECT.
 ```
 
-The class identifier appears first, followed by optional constructor/initialization arguments and the target object-reference variable.
-
 ```ebnf
 create-statement = "CREATE", class-identifier,
                    [ "USING", expression, { expression } ],
@@ -315,15 +155,7 @@ create-statement = "CREATE", class-identifier,
                    sentence-terminator ;
 ```
 
-`CREATE CUSTOMER AS CUSTOMER-OBJECT` creates a new instance of class `CUSTOMER` and stores the resulting object reference in `CUSTOMER-OBJECT`.
-
-`CREATE ... USING ... AS ...` passes the listed values to the class initialization mechanism. The exact mapping to constructors, factory methods, or COBOL object initialization semantics is specified by the class/type-system specification.
-
-The target must be assignment-compatible with the created class type.
-
 ### 4.4 DESTROY
-
-Neo COBOL provides an explicit object destruction/release statement:
 
 ```cobol
 DESTROY CUSTOMER-OBJECT.
@@ -333,199 +165,207 @@ DESTROY CUSTOMER-OBJECT.
 destroy-statement = "DESTROY", identifier, sentence-terminator ;
 ```
 
-`DESTROY` releases or invalidates the referenced object according to the runtime/memory-management model. After successful destruction, the reference is treated as no longer referring to a live object. The exact lifetime and storage-reclamation semantics remain part of the runtime specification.
-
 ## 5. Conditions
 
-Conditions use COBOL's English-oriented forms.
-
-```ebnf
-condition = relation-condition
-          | condition, "AND", condition
-          | condition, "OR", condition
-          | "NOT", condition ;
-
-relation-condition = expression, relation-operator, expression ;
-
-relation-operator = "IS", [ "NOT" ],
-                    ( "EQUAL TO"
-                    | "GREATER THAN"
-                    | "LESS THAN"
-                    | "GREATER THAN OR EQUAL TO"
-                    | "LESS THAN OR EQUAL TO" ) ;
-```
-
-Example:
-
-```cobol
-IF AGE IS GREATER THAN OR EQUAL TO 18
-    DISPLAY "ADULT"
-ELSE
-    DISPLAY "MINOR"
-END-IF.
-```
-
-Symbolic comparison operators are not part of the initial canonical grammar.
+Conditions use COBOL's English-oriented forms such as `IS EQUAL TO`, `IS GREATER THAN`, `AND`, `OR`, and `NOT`.
 
 ## 6. IF statement
 
-```ebnf
-if-statement = "IF", condition,
-               statement-list,
-               [ "ELSE", statement-list ],
-               ( "END-IF" | "END IF" ),
-               sentence-terminator ;
-```
-
-Both `END-IF` and the spaced Neo form `END IF` may be accepted. The compiler normalizes them to the same internal construct.
+COBOL-style `IF ... ELSE ... END-IF` is retained. `END IF` may be accepted as Neo shorthand and normalized to `END-IF`.
 
 ## 7. PERFORM
 
 COBOL-style `PERFORM` is retained.
 
-```ebnf
-perform-statement = "PERFORM",
-                    statement-list,
-                    ( "END-PERFORM" | "END PERFORM" ),
-                    sentence-terminator ;
-```
-
-Additional COBOL forms such as `PERFORM UNTIL`, `PERFORM VARYING`, and procedure invocation will be specified in later revisions.
-
 ## 8. Error handling
 
-Neo COBOL retains COBOL-style error phrases.
+Neo COBOL retains COBOL-style error phrases such as `ON ERROR`, `NOT ON ERROR`, `ON EXCEPTION`, and `NOT ON EXCEPTION`.
 
-Initial supported forms include:
+## 9. Classes, namespaces, and modern OOP
 
-```text
-ON ERROR
-NOT ON ERROR
-ON EXCEPTION
-NOT ON EXCEPTION
-```
+Neo COBOL keeps the COBOL 2002 object-oriented model and extends it with modern OOP facilities.
 
-These phrases are attached only to statements for which the corresponding condition is meaningful.
+### 9.1 Class types
 
-Example direction:
-
-```cobol
-CALL "SERVICE"
-    ON EXCEPTION
-        DISPLAY "CALL FAILED"
-END-CALL.
-```
-
-Exact attachment rules are still provisional.
-
-## 9. Classes and methods
-
-Neo COBOL includes object-oriented facilities based primarily on COBOL 2002.
-
-A class name also introduces a class type. Variables of a class type hold object references rather than embedding the complete object value.
-
-A class-typed variable may therefore refer to:
-
-- a live instance of the declared class,
-- an assignment-compatible derived-class instance,
-- `NULL`.
-
-Example direction:
+A class name also introduces a reference type.
 
 ```cobol
 01 CUSTOMER-OBJECT TYPE CUSTOMER.
-01 ACCOUNT-OBJECT  TYPE ACCOUNT.
 ```
 
-Class types are reference types. Assignment compatibility, inheritance conversion, nullability rules, and down-cast/up-cast behavior are defined by the type-system specification.
+A class-typed variable may refer to a live instance of the declared class, an assignment-compatible derived instance, or `NULL`.
 
-Traditional forms remain valid where supported:
+### 9.2 Access modifiers
+
+The following access modifiers are part of Neo COBOL:
+
+```text
+PUBLIC
+PRIVATE
+PROTECTED
+```
+
+They may be applied to classes, methods, and members where meaningful.
 
 ```cobol
-CLASS-ID. PERSON.
+PUBLIC CLASS CUSTOMER.
 
-OBJECT.
+PRIVATE 01 CUSTOMER-ID PIC X(20).
+PUBLIC  01 DISPLAY-NAME PIC X(40).
 
-METHOD-ID. GET-NAME.
-PROCEDURE DIVISION RETURNING RESULT.
-    MOVE NAME TO RESULT.
-END METHOD GET-NAME.
+PUBLIC METHOD GET-NAME
+    MOVE DISPLAY-NAME TO RESULT
+END METHOD.
 
-END OBJECT.
-END CLASS PERSON.
+PRIVATE METHOD CALCULATE-INTERNAL
+    ...
+END METHOD.
+
+END CLASS CUSTOMER.
 ```
 
-Neo COBOL may also accept a shorter spelling that expands to the same structure:
+Section-oriented grouping may also be supported for a more COBOL-like style:
 
 ```cobol
-CLASS PERSON
+PUBLIC SECTION.
+    METHOD GET-NAME
+    END METHOD.
 
-METHOD GET-NAME RETURNING RESULT
-    MOVE NAME TO RESULT
-END METHOD
-
-END CLASS
+PRIVATE SECTION.
+    METHOD CALCULATE-INTERNAL
+    END METHOD.
 ```
 
-Preliminary grammar:
+The exact interaction between section visibility and per-member modifiers remains to be finalized.
+
+### 9.3 STATIC
+
+`STATIC` declares a member or method that belongs to the class rather than to a specific instance.
+
+```cobol
+PUBLIC STATIC 01 MAX-CUSTOMERS PIC 9(5).
+
+PUBLIC STATIC METHOD CREATE-DEFAULT
+    ...
+END METHOD.
+```
+
+### 9.4 Inheritance
+
+Neo COBOL uses `INHERITS` for class inheritance.
+
+```cobol
+PUBLIC CLASS EMPLOYEE INHERITS PERSON.
+    ...
+END CLASS EMPLOYEE.
+```
+
+A derived-class reference is assignment-compatible with an accessible base-class reference subject to the type-system rules.
+
+### 9.5 ABSTRACT
+
+`ABSTRACT` may be applied to a class or method.
+
+```cobol
+PUBLIC ABSTRACT CLASS SHAPE.
+
+PUBLIC ABSTRACT METHOD CALCULATE-AREA
+    RETURNING AREA
+END METHOD.
+```
+
+An abstract class cannot be instantiated directly. An abstract method has no concrete implementation in the declaring class and must be implemented by a non-abstract derived class unless another applicable rule is specified.
+
+### 9.6 OVERRIDE
+
+`OVERRIDE` explicitly marks a method that overrides an inherited method.
+
+```cobol
+PUBLIC OVERRIDE METHOD CALCULATE-AREA
+    ...
+END METHOD.
+```
+
+The compiler should diagnose an `OVERRIDE` method that does not match an overridable inherited member.
+
+### 9.7 SEALED
+
+`SEALED` prevents further inheritance or overriding, depending on where it is applied.
+
+```cobol
+PUBLIC SEALED CLASS CUSTOMER.
+    ...
+END CLASS CUSTOMER.
+```
+
+A sealed class cannot be inherited.
+
+```cobol
+PUBLIC SEALED OVERRIDE METHOD VALIDATE
+    ...
+END METHOD.
+```
+
+A sealed method may not be overridden by further derived classes.
+
+### 9.8 Modifier combinations
+
+Preliminary modifier sets are:
 
 ```ebnf
-class-definition = class-header,
-                   { data-description | method-definition },
-                   class-end ;
-
-class-header = ( "CLASS-ID.", identifier, sentence-terminator )
-             | ( "CLASS", identifier, sentence-terminator ) ;
-
-class-end = "END", [ "CLASS" ], [ identifier ], sentence-terminator
-          | "END-CLASS", [ identifier ], sentence-terminator ;
-
-class-identifier = identifier ;
+access-modifier = "PUBLIC" | "PRIVATE" | "PROTECTED" ;
+class-modifier = access-modifier | "ABSTRACT" | "SEALED" ;
+member-modifier = access-modifier | "STATIC" | "ABSTRACT" | "OVERRIDE" | "SEALED" ;
 ```
 
-The exact compatibility rules with standard COBOL object syntax remain to be finalized.
+Illegal combinations such as `ABSTRACT SEALED CLASS` must be rejected unless explicitly defined otherwise in the type-system specification.
+
+### 9.9 Namespace
+
+Neo COBOL provides namespaces for organizing classes, functions, and other public program elements.
+
+```cobol
+NAMESPACE COMPANY.CUSTOMER
+
+PUBLIC CLASS CUSTOMER.
+    ...
+END CLASS CUSTOMER.
+
+END NAMESPACE.
+```
+
+Namespace components are case-insensitive identifiers. A period inside a namespace-qualified name is treated as a namespace separator rather than a sentence terminator when it occurs between valid namespace components.
+
+```ebnf
+namespace-definition = "NAMESPACE", qualified-name, sentence-terminator,
+                       { namespace-member },
+                       "END", "NAMESPACE", sentence-terminator ;
+
+qualified-name = identifier, { ".", identifier } ;
+```
+
+The exact import/use syntax for accessing members of another namespace remains to be specified.
+
+### 9.10 Preliminary class grammar
+
+```ebnf
+class-definition = { class-modifier }, "CLASS", identifier,
+                   [ "INHERITS", qualified-name ],
+                   sentence-terminator,
+                   { class-member },
+                   ( "END CLASS" | "END-CLASS" ),
+                   [ identifier ], sentence-terminator ;
+```
+
+Traditional COBOL 2002 forms such as `CLASS-ID.` and `METHOD-ID.` remain valid where supported; Neo forms normalize to the same internal representation.
 
 ## 10. Functions
 
-Functions are based on COBOL 2002 concepts and use explicit English-oriented parameter and return clauses.
-
-Example Neo form:
-
-```cobol
-FUNCTION ADD-NUMBERS USING A B RETURNING RESULT
-    COMPUTE RESULT = A + B
-END FUNCTION.
-```
-
-Preliminary grammar:
-
-```ebnf
-function-definition = function-header,
-                      statement-list,
-                      function-end ;
-
-function-header = ( "FUNCTION-ID.", identifier, sentence-terminator
-                  | "FUNCTION", identifier )
-                  [ "USING", identifier, { identifier } ]
-                  [ "RETURNING", identifier ] ;
-
-function-end = "END", "FUNCTION", [ identifier ], sentence-terminator
-             | "END-FUNCTION", [ identifier ], sentence-terminator ;
-```
-
-The final relationship between `FUNCTION-ID`, intrinsic functions, user-defined functions, and methods remains to be specified.
+Functions remain based on COBOL 2002 concepts and use explicit English-oriented parameter and return clauses.
 
 ## 11. Division inference
 
-When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis.
-
-Initial rules:
-
-- Program metadata such as `PROGRAM-ID` belongs to the Identification Division.
-- Level-number data declarations such as `01`, `05`, and related entries belong to the Data Division.
-- Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division.
-- Top-level `CLASS`, `METHOD`, and `FUNCTION` constructs are recognized directly and are not inferred from arbitrary statement text.
-- If a source fragment could validly belong to more than one implicit region, the compiler must reject it rather than guess.
+When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis. Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division. Top-level `CLASS`, `FUNCTION`, and `NAMESPACE` constructs are recognized directly.
 
 ## 12. Normalization model
 
@@ -540,9 +380,7 @@ END IF              -> END-IF
 END PERFORM         -> END-PERFORM
 ```
 
-Similarly, omitted divisions and sections are represented internally as explicit AST nodes after parsing.
-
-This allows later compiler stages and backends to operate on one canonical representation rather than maintaining separate Neo and traditional COBOL semantics.
+Omitted divisions and sections are represented internally as explicit AST nodes after parsing.
 
 ## 13. Compatibility rule
 
@@ -555,22 +393,19 @@ Neo syntax should extend COBOL rather than silently redefine familiar COBOL synt
 The following remain to be specified:
 
 - Exact period-omission boundary rules
-- Full lexical grammar and reserved-word set
+- Full reserved-word set
 - Numeric and data-description grammar
-- `PIC` and modern type syntax, if any
-- detailed class-type declaration rules
-- constructor/initialization semantics for `CREATE ... USING ... AS ...`
-- object lifetime and destruction semantics for `DESTROY`
+- `PIC` and modern type syntax
+- Detailed class-type declaration rules
+- Constructor/initialization semantics
+- Object lifetime and destruction semantics
+- Detailed inheritance and conversion rules
+- Namespace import/use syntax
+- Interfaces, if supported
+- Generic or parameterized facilities, if any
 - `COMPUTE`
 - `CALL`
 - `EVALUATE`
-- complete `PERFORM` forms
-- `READ`, `WRITE`, `OPEN`, `CLOSE`, and file handling
-- exception/error phrase attachment rules
-- modules and imports
-- visibility
-- inheritance and interfaces, if supported
-- generic or parameterized facilities, if any
-- interoperability syntax
-
-This document will be expanded incrementally as these decisions are made.
+- Complete `PERFORM` forms
+- File handling
+- Interoperability syntax
