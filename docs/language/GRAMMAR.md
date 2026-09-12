@@ -53,6 +53,25 @@ A period is preferred and always valid where COBOL permits it. Omission is permi
 
 A missing period must never change the meaning of an otherwise valid program.
 
+### 2.4 Comments
+
+Neo COBOL uses the standard free-format COBOL comment marker `*>`.
+
+`*>` begins a comment and the comment continues to the end of the physical source line. It may appear at the beginning of a line or after source code.
+
+```cobol
+*> This is a full-line comment.
+MOVE SOURCE-VALUE TO TARGET-VALUE. *> This is an inline comment.
+```
+
+Comments are lexical whitespace and have no semantic effect. The comment marker is not recognized while it appears inside a character-string literal.
+
+```ebnf
+comment = "*>", { any-character-except-line-terminator } ;
+```
+
+Neo COBOL does not introduce `//` or `/* ... */` as canonical comment syntax.
+
 ## 3. Program structure
 
 Traditional COBOL divisions remain valid:
@@ -332,7 +351,6 @@ The following remain to be specified:
 
 - Exact period-omission boundary rules
 - Full lexical grammar and reserved-word set
-- Comment syntax
 - Literal syntax
 - Numeric and data-description grammar
 - `PIC` and modern type syntax, if any
