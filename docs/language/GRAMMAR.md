@@ -439,13 +439,69 @@ MOVE FUNCTION USING X
 TO INCREMENT.
 ```
 
-A named binding form may also be supported by declarations or other syntax defined by the type-system specification; the core callable value remains the anonymous `FUNCTION` expression.
-
 ### 10.1 Function types
 
-Neo COBOL has function-reference types so anonymous and named functions can be treated as values. Exact declaration syntax, parameter variance, return-type compatibility, and overload interaction are part of the type-system specification.
+Neo COBOL has first-class function-reference types. Function type syntax deliberately follows the same `FUNCTION`, `USING`, and `RETURNING` word order as named and anonymous functions.
 
-A function value may be `NULL` where nullable function references are permitted.
+A variable may declare its callable type directly:
+
+```cobol
+01 TRANSFORMER TYPE FUNCTION USING NUMBER RETURNING NUMBER.
+01 PREDICATE   TYPE FUNCTION USING CUSTOMER RETURNING BOOLEAN.
+```
+
+This reads as: `TRANSFORMER` is a value of type "function using NUMBER returning NUMBER".
+
+The entries after `USING` in a function type are parameter **types**, not parameter names. `RETURNING` specifies the return type.
+
+```ebnf
+function-type-reference = "FUNCTION",
+                          [ "USING", type-reference,
+                            { type-reference } ],
+                          "RETURNING", type-reference ;
+```
+
+For frequently reused signatures, Neo COBOL also provides named function types:
+
+```cobol
+FUNCTION TYPE CUSTOMER-PREDICATE
+    USING CUSTOMER
+    RETURNING BOOLEAN.
+
+FUNCTION TYPE NUMBER-TRANSFORMER
+    USING NUMBER
+    RETURNING NUMBER.
+```
+
+A variable can then use the named type like any other type:
+
+```cobol
+01 IS-VALID TYPE CUSTOMER-PREDICATE.
+01 TRANSFORM TYPE NUMBER-TRANSFORMER.
+```
+
+Preliminary grammar:
+
+```ebnf
+function-type-definition = "FUNCTION", "TYPE", identifier,
+                           [ "USING", type-reference,
+                             { type-reference } ],
+                           "RETURNING", type-reference,
+                           sentence-terminator ;
+```
+
+Function types are structurally compatible when their parameter and return types satisfy the function-type compatibility rules. Exact variance rules are part of the type-system specification.
+
+A compatible named function or anonymous function may be assigned to a function-reference variable:
+
+```cobol
+MOVE FUNCTION USING X
+         RETURN X + 1
+     END FUNCTION
+TO TRANSFORMER.
+```
+
+Function references may be `NULL` where nullable references are permitted.
 
 ### 10.2 Closures
 
@@ -470,7 +526,7 @@ Anonymous functions and closures are Neo COBOL extensions. When targeting tradit
 
 ## 11. Division inference
 
-When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis. Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division. Top-level `CLASS`, `INTERFACE`, `FUNCTION`, and `NAMESPACE` constructs are recognized directly.
+When divisions are omitted, the compiler conceptually inserts canonical COBOL structure before semantic analysis. Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division. Top-level `CLASS`, `INTERFACE`, `FUNCTION`, `FUNCTION TYPE`, and `NAMESPACE` constructs are recognized directly.
 
 ## 12. Normalization model
 
@@ -507,7 +563,7 @@ The following remain to be specified:
 - Detailed inheritance, casting, and interface conversion rules
 - Interface property/event/default-method policy
 - Namespace import/use syntax
-- Exact function-reference type declaration syntax
+- Function-type variance and overload interaction
 - Closure capture mode and mutability rules
 - Generic or parameterized facilities, if any
 - `COMPUTE`
