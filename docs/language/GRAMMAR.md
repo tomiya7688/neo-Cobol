@@ -297,6 +297,44 @@ Example:
 DISPLAY "HELLO WORLD".
 ```
 
+### 4.3 CREATE
+
+Neo COBOL uses an English-oriented object creation statement.
+
+```cobol
+CREATE CUSTOMER AS CUSTOMER-OBJECT.
+CREATE CUSTOMER USING NAME AGE AS CUSTOMER-OBJECT.
+```
+
+The class identifier appears first, followed by optional constructor/initialization arguments and the target object-reference variable.
+
+```ebnf
+create-statement = "CREATE", class-identifier,
+                   [ "USING", expression, { expression } ],
+                   "AS", identifier,
+                   sentence-terminator ;
+```
+
+`CREATE CUSTOMER AS CUSTOMER-OBJECT` creates a new instance of class `CUSTOMER` and stores the resulting object reference in `CUSTOMER-OBJECT`.
+
+`CREATE ... USING ... AS ...` passes the listed values to the class initialization mechanism. The exact mapping to constructors, factory methods, or COBOL object initialization semantics is specified by the class/type-system specification.
+
+The target must be assignment-compatible with the created class type.
+
+### 4.4 DESTROY
+
+Neo COBOL provides an explicit object destruction/release statement:
+
+```cobol
+DESTROY CUSTOMER-OBJECT.
+```
+
+```ebnf
+destroy-statement = "DESTROY", identifier, sentence-terminator ;
+```
+
+`DESTROY` releases or invalidates the referenced object according to the runtime/memory-management model. After successful destruction, the reference is treated as no longer referring to a live object. The exact lifetime and storage-reclamation semantics remain part of the runtime specification.
+
 ## 5. Conditions
 
 Conditions use COBOL's English-oriented forms.
@@ -384,6 +422,23 @@ Exact attachment rules are still provisional.
 
 Neo COBOL includes object-oriented facilities based primarily on COBOL 2002.
 
+A class name also introduces a class type. Variables of a class type hold object references rather than embedding the complete object value.
+
+A class-typed variable may therefore refer to:
+
+- a live instance of the declared class,
+- an assignment-compatible derived-class instance,
+- `NULL`.
+
+Example direction:
+
+```cobol
+01 CUSTOMER-OBJECT TYPE CUSTOMER.
+01 ACCOUNT-OBJECT  TYPE ACCOUNT.
+```
+
+Class types are reference types. Assignment compatibility, inheritance conversion, nullability rules, and down-cast/up-cast behavior are defined by the type-system specification.
+
 Traditional forms remain valid where supported:
 
 ```cobol
@@ -424,6 +479,8 @@ class-header = ( "CLASS-ID.", identifier, sentence-terminator )
 
 class-end = "END", [ "CLASS" ], [ identifier ], sentence-terminator
           | "END-CLASS", [ identifier ], sentence-terminator ;
+
+class-identifier = identifier ;
 ```
 
 The exact compatibility rules with standard COBOL object syntax remain to be finalized.
@@ -466,7 +523,7 @@ Initial rules:
 
 - Program metadata such as `PROGRAM-ID` belongs to the Identification Division.
 - Level-number data declarations such as `01`, `05`, and related entries belong to the Data Division.
-- Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, and `CALL` belong to the Procedure Division.
+- Executable statements such as `MOVE`, `DISPLAY`, `IF`, `PERFORM`, `CALL`, `CREATE`, and `DESTROY` belong to the Procedure Division.
 - Top-level `CLASS`, `METHOD`, and `FUNCTION` constructs are recognized directly and are not inferred from arbitrary statement text.
 - If a source fragment could validly belong to more than one implicit region, the compiler must reject it rather than guess.
 
@@ -501,6 +558,9 @@ The following remain to be specified:
 - Full lexical grammar and reserved-word set
 - Numeric and data-description grammar
 - `PIC` and modern type syntax, if any
+- detailed class-type declaration rules
+- constructor/initialization semantics for `CREATE ... USING ... AS ...`
+- object lifetime and destruction semantics for `DESTROY`
 - `COMPUTE`
 - `CALL`
 - `EVALUATE`
