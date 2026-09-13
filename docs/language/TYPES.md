@@ -2,149 +2,106 @@
 
 Status: Draft
 
-This document records logical type-system decisions already made. Representation constraints based on traditional COBOL `PIC` are specified separately in [PIC.md](PIC.md).
+Representation constraints are specified in [PIC.md](PIC.md). Variable declarations are specified in [VARIABLES.md](VARIABLES.md).
 
-## 1. Type categories
+## 1. Core rule
 
-Neo COBOL currently distinguishes at least:
+`TYPE` defines the logical type and its default representation. `PIC` may refine a compatible representation.
 
-- primitive/scalar values,
-- traditional COBOL data descriptions and records,
-- class reference types,
-- interface reference types,
-- function reference types,
-- Boolean values,
-- null references.
+Neo COBOL avoids redundant built-in aliases.
 
-## 2. TYPE and representation
+## 2. Built-in scalar types
 
-`TYPE` defines the logical type of a value and provides its language-defined default representation.
-
-Traditional `PIC` syntax remains part of Neo COBOL, but it is integrated into the same type model rather than acting as an unrelated second type system.
-
-A `PIC` clause refines or overrides representation constraints of a compatible `TYPE`.
-
-```cobol
-01 AGE TYPE INTEGER.
-01 AGE-3-DIGITS TYPE INTEGER PIC 9(3).
-```
-
-A traditional PIC-only declaration remains valid and is normalized by inferring a compatible logical `TYPE`.
-
-```cobol
-01 LEGACY-AGE PIC 9(3).
-```
-
-See [PIC.md](PIC.md) for the detailed normalization and compatibility rules.
-
-## 3. Boolean
-
-Neo COBOL has a Boolean type with literals:
+Canonical built-in scalar types are:
 
 ```text
-TRUE
-FALSE
+INT
+DEC
+STR
+BOOL
+FLOAT
+BYTE
+LONG
+DOUBLE
 ```
 
-Boolean values are intended for conditions, function results, and normal data use.
+Aliases such as `INTEGER`, `BOOLEAN`, `STRING`, and `NUMBER` are not canonical type names.
 
-## 4. Null
+- `INT`: normal signed integer.
+- `LONG`: wider signed integer.
+- `BYTE`: byte-sized integer/data unit; intended default is 8-bit.
+- `DEC`: exact decimal/fixed-point numeric type.
+- `FLOAT`: normal floating-point type; intended default is 32-bit.
+- `DOUBLE`: wider floating-point type; intended default is 64-bit.
+- `STR`: normal string type.
+- `BOOL`: Boolean type with `TRUE` and `FALSE` literals.
 
-`NULL` denotes the absence of a reference.
-
-`NULL` is valid for reference-like types where nullability is permitted, including class, interface, and function references.
-
-The language will define static diagnostics for invalid null use. Exact nullable/non-null syntax is not yet fixed.
-
-## 5. Class types
-
-A class declaration introduces a class reference type.
+Examples:
 
 ```cobol
-01 CUSTOMER-OBJECT TYPE CUSTOMER.
+01 AGE TYPE INT.
+01 PRICE TYPE DEC PIC S9(7)V99.
+01 NAME TYPE STR PIC X(20).
+01 IS-ACTIVE TYPE BOOL.
 ```
 
-A variable of class type stores an object reference rather than embedding the full object value.
+Exact backend representations remain separately specified.
 
-It may refer to:
+## 3. STRUCT
 
-- an instance of the declared class,
-- an assignment-compatible derived-class instance,
-- `NULL` where nullable references are permitted.
-
-Derived-to-base assignment is supported subject to accessibility and inheritance rules. Explicit down-cast syntax remains to be specified.
-
-## 6. Interface types
-
-An interface declaration introduces an interface reference type.
-
-An interface reference may refer to any object whose class implements that interface, or to `NULL` where nullable references are permitted.
-
-Interfaces do not imply multiple class inheritance.
-
-## 7. Function types
-
-Functions are first-class values.
-
-An inline function-reference type may be written as:
+`STRUCT` defines a user-defined aggregate value type. It is for grouped data that does not require class identity or inheritance.
 
 ```cobol
-01 TRANSFORMER TYPE FUNCTION USING NUMBER RETURNING NUMBER.
-01 PREDICATE   TYPE FUNCTION USING CUSTOMER RETURNING BOOLEAN.
+STRUCT CUSTOMER-DATA
+    01 ID TYPE INT.
+    01 NAME TYPE STR.
+END STRUCT.
+
+01 CUSTOMER TYPE CUSTOMER-DATA.
 ```
 
-The general direction is:
+Detailed layout and interaction with traditional COBOL records remain open.
 
-```ebnf
-function-type-reference = "FUNCTION",
-                          [ "USING", type-reference, { type-reference } ],
-                          [ "RETURNING", type-reference ] ;
+## 4. Reference types and NULL
+
+Class, interface, and function types are reference-like types. `NULL` may be used where nullability is permitted.
+
+Scalar and `STRUCT` values are not implicitly nullable.
+
+## 5. Function types
+
+```cobol
+01 TRANSFORMER TYPE FUNCTION USING INT RETURNING INT.
+01 PREDICATE TYPE FUNCTION USING CUSTOMER RETURNING BOOL.
 ```
 
-Reusable named function types may be declared:
+Reusable named function types remain supported:
 
 ```cobol
 FUNCTION TYPE CUSTOMER-PREDICATE
     USING CUSTOMER
-    RETURNING BOOLEAN.
+    RETURNING BOOL.
 ```
 
-and then referenced as a normal type:
+## 6. Type inference declarations
 
-```cobol
-01 IS-VALID TYPE CUSTOMER-PREDICATE.
-```
+`VAR` and `LET` are declarations, not types.
 
-Named functions, anonymous functions, and closures may be assigned where their signatures are compatible with the destination function type.
+- `VAR`: inferred type, mutable binding.
+- `LET`: inferred type, non-reassignable binding.
 
-A function reference may be `NULL` where nullable references are permitted.
+See [VARIABLES.md](VARIABLES.md).
 
-## 8. Function compatibility
+## 7. Traditional COBOL data
 
-A function value must have a compatible parameter list and return type.
+Traditional level numbers, records, and `PIC` remain valid. PIC-only declarations are normalized to an inferred logical type plus the original `PIC` constraint.
 
-Exact variance, overload interaction, implicit conversions, and callable covariance/contravariance are not yet fixed.
+## 8. Open items
 
-## 9. Traditional COBOL data
-
-Traditional COBOL level numbers, records, `PIC`, and related data-description concepts remain part of Neo COBOL.
-
-The unified rule is:
-
-```text
-TYPE = logical type and default representation
-PIC  = compatible representation constraint/override
-```
-
-PIC-only legacy declarations are normalized to an inferred logical type plus the original PIC constraint.
-
-## 10. Open items
-
-- Full primitive/scalar type set
-- Default representation for each scalar type
-- Nullable/non-null reference syntax and defaults
-- Explicit casting syntax
-- Numeric conversion rules
-- Function variance and overload compatibility
-- Generic/parameterized types
-- COBOL/C/Bitlang representation mappings
+- Exact integer and byte representations
+- Default `DEC` precision/scale
+- Default `STR` representation
+- Nullable/non-null syntax
+- Casting and numeric promotion rules
+- Detailed `STRUCT` layout
+- Backend mappings
