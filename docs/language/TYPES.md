@@ -2,7 +2,7 @@
 
 Status: Draft
 
-This document records type-system decisions already made. Detailed scalar/PIC mapping remains open.
+This document records logical type-system decisions already made. Representation constraints based on traditional COBOL `PIC` are specified separately in [PIC.md](PIC.md).
 
 ## 1. Type categories
 
@@ -16,7 +16,28 @@ Neo COBOL currently distinguishes at least:
 - Boolean values,
 - null references.
 
-## 2. Boolean
+## 2. TYPE and representation
+
+`TYPE` defines the logical type of a value and provides its language-defined default representation.
+
+Traditional `PIC` syntax remains part of Neo COBOL, but it is integrated into the same type model rather than acting as an unrelated second type system.
+
+A `PIC` clause refines or overrides representation constraints of a compatible `TYPE`.
+
+```cobol
+01 AGE TYPE INTEGER.
+01 AGE-3-DIGITS TYPE INTEGER PIC 9(3).
+```
+
+A traditional PIC-only declaration remains valid and is normalized by inferring a compatible logical `TYPE`.
+
+```cobol
+01 LEGACY-AGE PIC 9(3).
+```
+
+See [PIC.md](PIC.md) for the detailed normalization and compatibility rules.
+
+## 3. Boolean
 
 Neo COBOL has a Boolean type with literals:
 
@@ -27,7 +48,7 @@ FALSE
 
 Boolean values are intended for conditions, function results, and normal data use.
 
-## 3. Null
+## 4. Null
 
 `NULL` denotes the absence of a reference.
 
@@ -35,7 +56,7 @@ Boolean values are intended for conditions, function results, and normal data us
 
 The language will define static diagnostics for invalid null use. Exact nullable/non-null syntax is not yet fixed.
 
-## 4. Class types
+## 5. Class types
 
 A class declaration introduces a class reference type.
 
@@ -53,7 +74,7 @@ It may refer to:
 
 Derived-to-base assignment is supported subject to accessibility and inheritance rules. Explicit down-cast syntax remains to be specified.
 
-## 5. Interface types
+## 6. Interface types
 
 An interface declaration introduces an interface reference type.
 
@@ -61,7 +82,7 @@ An interface reference may refer to any object whose class implements that inter
 
 Interfaces do not imply multiple class inheritance.
 
-## 6. Function types
+## 7. Function types
 
 Functions are first-class values.
 
@@ -98,24 +119,29 @@ Named functions, anonymous functions, and closures may be assigned where their s
 
 A function reference may be `NULL` where nullable references are permitted.
 
-## 7. Function compatibility
+## 8. Function compatibility
 
 A function value must have a compatible parameter list and return type.
 
 Exact variance, overload interaction, implicit conversions, and callable covariance/contravariance are not yet fixed.
 
-## 8. Traditional COBOL data
+## 9. Traditional COBOL data
 
-Traditional COBOL data-description concepts, including level numbers and `PIC`, remain part of Neo COBOL.
+Traditional COBOL level numbers, records, `PIC`, and related data-description concepts remain part of Neo COBOL.
 
-Modern types extend rather than replace traditional COBOL data descriptions.
+The unified rule is:
 
-Detailed `PIC`, `USAGE`, numeric storage, string storage, and mapping rules will be specified separately.
+```text
+TYPE = logical type and default representation
+PIC  = compatible representation constraint/override
+```
 
-## 9. Open items
+PIC-only legacy declarations are normalized to an inferred logical type plus the original PIC constraint.
+
+## 10. Open items
 
 - Full primitive/scalar type set
-- `PIC` and modern scalar type interaction
+- Default representation for each scalar type
 - Nullable/non-null reference syntax and defaults
 - Explicit casting syntax
 - Numeric conversion rules
