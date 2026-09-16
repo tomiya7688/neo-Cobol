@@ -10,6 +10,8 @@ Representation constraints are specified in [PIC.md](PIC.md). Variable declarati
 
 When two spellings have the same meaning, Neo COBOL prefers the more COBOL-like, English-readable full word over an abbreviated alias.
 
+Neo COBOL uses COBOL-like names and source syntax while giving built-in machine-oriented types modern, deterministic widths. Source-level semantics must not change merely because a backend C compiler, COBOL compiler, or target CPU uses a different native width.
+
 ## 2. Built-in scalar types
 
 Canonical built-in scalar types are:
@@ -27,25 +29,61 @@ DOUBLE
 
 Short aliases such as `INT`, `DEC`, `STR`, and `BOOL` are not canonical type names.
 
-- `INTEGER`: normal signed integer.
-- `LONG`: wider signed integer.
-- `BYTE`: byte-sized integer/data unit; intended default is 8-bit.
-- `DECIMAL`: exact decimal/fixed-point numeric type.
-- `FLOAT`: normal floating-point type; intended default is 32-bit.
-- `DOUBLE`: wider floating-point type; intended default is 64-bit.
-- `STRING`: normal string type.
-- `BOOLEAN`: Boolean type with `TRUE` and `FALSE` literals.
+### 2.1 Numeric widths
+
+The canonical language-level widths are:
+
+| Type | Meaning | Canonical width |
+| --- | --- | ---: |
+| `BYTE` | unsigned byte-sized integer/data unit | 8 bits |
+| `INTEGER` | normal signed integer | 32 bits |
+| `LONG` | wide signed integer | 64 bits |
+| `FLOAT` | IEEE-754 binary floating point | 32 bits |
+| `DOUBLE` | IEEE-754 binary floating point | 64 bits |
+| `DECIMAL` | exact decimal numeric type | 128 bits |
+
+Backends may use another physical representation internally only when observable Neo COBOL semantics are preserved.
+
+`PIC` may further constrain the representable field layout without changing the logical type.
 
 Examples:
 
 ```cobol
 01 AGE TYPE INTEGER.
+01 ACCOUNT-ID TYPE LONG.
+01 FLAGS TYPE BYTE.
 01 PRICE TYPE DECIMAL PIC S9(7)V99.
-01 NAME TYPE STRING PIC X(20).
-01 IS-ACTIVE TYPE BOOLEAN.
+01 RATIO TYPE FLOAT.
+01 PRECISE-RATIO TYPE DOUBLE.
 ```
 
-Exact backend representations remain separately specified.
+### 2.2 STRING
+
+`STRING` is the normal Neo COBOL text type.
+
+```cobol
+01 NAME TYPE STRING.
+01 FIXED-NAME TYPE STRING PIC X(20).
+```
+
+The language-level string is not limited to legacy fixed-width COBOL character fields. `PIC X(n)` may impose a compatible field representation constraint where required.
+
+The canonical character encoding and exact in-memory string representation remain to be specified separately.
+
+### 2.3 BOOLEAN
+
+`BOOLEAN` is the logical Boolean type and has the literals:
+
+```text
+TRUE
+FALSE
+```
+
+Its language semantics are independent of the backend's physical Boolean representation.
+
+```cobol
+01 IS-ACTIVE TYPE BOOLEAN.
+```
 
 ## 3. STRUCT
 
@@ -96,11 +134,23 @@ See [VARIABLES.md](VARIABLES.md).
 
 Traditional level numbers, records, and `PIC` remain valid. PIC-only declarations are normalized to an inferred logical type plus the original `PIC` constraint.
 
-## 8. Open items
+## 8. Design rule for modernization
 
-- Exact integer and byte representations
-- Default `DECIMAL` precision/scale
-- Default `STRING` representation
+Neo COBOL modernizes semantics without needlessly modernizing surface spelling.
+
+As a default rule:
+
+- prefer COBOL or English-like terminology and statement forms,
+- retain established COBOL constructs when they remain useful,
+- use modern fixed-width numeric semantics,
+- make backend-dependent representation differences non-observable where practical,
+- add modern features by extending COBOL concepts rather than replacing them with unrelated syntax.
+
+## 9. Open items
+
+- Signed/unsigned arithmetic details for `BYTE`
+- Default `DECIMAL` precision and scale within the 128-bit representation
+- Canonical `STRING` encoding and storage model
 - Nullable/non-null syntax
 - Casting and numeric promotion rules
 - Detailed `STRUCT` layout
