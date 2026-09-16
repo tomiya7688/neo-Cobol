@@ -18,28 +18,28 @@ PIC  = compatible representation constraint
 ## 2. TYPE-only declarations
 
 ```cobol
-01 AGE TYPE INT.
-01 NAME TYPE STR.
-01 PRICE TYPE DEC.
-01 IS-ACTIVE TYPE BOOL.
+01 AGE TYPE INTEGER.
+01 NAME TYPE STRING.
+01 PRICE TYPE DECIMAL.
+01 IS-ACTIVE TYPE BOOLEAN.
 ```
 
 ## 3. TYPE with PIC
 
 ```cobol
-01 AGE TYPE INT PIC 9(3).
-01 NAME TYPE STR PIC X(20).
-01 PRICE TYPE DEC PIC S9(7)V99.
+01 AGE TYPE INTEGER PIC 9(3).
+01 NAME TYPE STRING PIC X(20).
+01 PRICE TYPE DECIMAL PIC S9(7)V99.
 ```
 
 The logical type remains unchanged; `PIC` adds a field representation constraint.
 
 ```cobol
-01 SMALL-VALUE TYPE INT PIC 9(3).
-01 LARGE-VALUE TYPE INT PIC 9(8).
+01 SMALL-VALUE TYPE INTEGER PIC 9(3).
+01 LARGE-VALUE TYPE INTEGER PIC 9(8).
 ```
 
-Both are `INT` values even though their field layouts differ.
+Both are `INTEGER` values even though their field layouts differ.
 
 ## 4. PIC-only compatibility syntax
 
@@ -56,18 +56,18 @@ When `TYPE` is omitted, the compiler infers a compatible Neo COBOL logical type 
 ## 5. Intended combinations
 
 ```cobol
-TYPE INT PIC 9(5)
-TYPE DEC PIC S9(7)V99
-TYPE STR PIC X(20)
+TYPE INTEGER PIC 9(5)
+TYPE DECIMAL PIC S9(7)V99
+TYPE STRING PIC X(20)
 ```
 
 A `PIC` that is incompatible with the declared logical type is invalid.
 
 Class, interface, and function reference types do not normally use `PIC`.
 
-## 6. BOOL
+## 6. BOOLEAN
 
-`BOOL` has a language-defined default representation. A target-specific compatible layout may be defined later without changing its Boolean semantics.
+`BOOLEAN` has a language-defined default representation. A target-specific compatible layout may be defined later without changing its Boolean semantics.
 
 ## 7. Normalization
 
@@ -83,7 +83,7 @@ PIC-only declaration
 - Exact PIC-to-TYPE inference table
 - Default representation of built-in types
 - `USAGE` interaction
-- `DEC` precision defaults
-- `STR` representation details
+- `DECIMAL` precision defaults
+- `STRING` representation details
 - Edited PIC/display forms
 - Backend mappings
