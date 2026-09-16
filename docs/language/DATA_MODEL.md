@@ -33,6 +33,8 @@ Traditional record layouts and `STRUCT` share the same aggregate field model int
 
 Neo COBOL uses COBOL `OCCURS` as its canonical array/table syntax rather than introducing a second bracket-based array declaration language.
 
+### 2.1 Fixed-length arrays
+
 ```cobol
 01 SCORES TYPE INTEGER OCCURS 10.
 ```
@@ -41,15 +43,91 @@ Traditional fixed-size `OCCURS` is a fixed-length array whose element type is th
 
 Array indexing is one-based by default, matching COBOL table conventions.
 
-Variable-length arrays use an explicit dynamic form:
+### 2.2 Dynamic arrays
+
+Neo COBOL provides a general-purpose variable-length array using `OCCURS DYNAMIC`.
 
 ```cobol
 01 ITEMS TYPE CUSTOMER-DATA OCCURS DYNAMIC.
+01 SCORES TYPE INTEGER OCCURS DYNAMIC.
 ```
 
-A dynamic `OCCURS` value has runtime-managed length and capacity. Exact allocation and growth strategy are implementation details and must not change language semantics.
+A dynamic array has:
 
-Traditional `OCCURS ... DEPENDING ON ...` remains supported for COBOL-compatible externally described layouts. It is not the preferred general-purpose dynamic collection mechanism.
+- a runtime length,
+- implementation-managed capacity,
+- one logical element type,
+- one-based indexing,
+- automatic storage growth when elements are appended.
+
+Capacity management is not observable language semantics. An implementation may use any growth strategy as long as element order, values, and defined failure behavior are preserved.
+
+A newly initialized dynamic array has length zero unless an initializer specifies elements.
+
+### 2.3 Dynamic array operations
+
+Appending an element uses an English-oriented statement:
+
+```cobol
+APPEND NEW-CUSTOMER TO ITEMS.
+APPEND SCORE TO SCORES.
+```
+
+The appended value must be assignment-compatible with the array element type.
+
+Removing an element uses `REMOVE ... FROM ...`:
+
+```cobol
+REMOVE LAST FROM ITEMS.
+REMOVE ITEM-INDEX FROM ITEMS.
+```
+
+`LAST` removes the final element. An integer expression removes the element at that one-based index and shifts following elements toward the beginning.
+
+Explicit resizing uses:
+
+```cobol
+RESIZE ITEMS TO 100.
+```
+
+When growing, newly created elements receive the element type's defined default value. When shrinking, elements beyond the new length are discarded.
+
+The current element count is read with:
+
+```cobol
+LENGTH OF ITEMS
+```
+
+For example:
+
+```cobol
+IF LENGTH OF ITEMS IS GREATER THAN 0
+    REMOVE LAST FROM ITEMS
+END-IF.
+```
+
+Preliminary grammar:
+
+```ebnf
+dynamic-occurs-clause = "OCCURS", "DYNAMIC" ;
+append-statement = "APPEND", expression, "TO", identifier, sentence-terminator ;
+remove-statement = "REMOVE", ( "LAST" | expression ), "FROM", identifier, sentence-terminator ;
+resize-statement = "RESIZE", identifier, "TO", expression, sentence-terminator ;
+array-length-expression = "LENGTH", "OF", expression ;
+```
+
+Bounds checks are mandatory for dynamic-array indexing and removal. Invalid indexing must not silently access unrelated storage. The exact runtime error object/handling path is specified with the general runtime error model.
+
+### 2.4 OCCURS DEPENDING ON
+
+Traditional `OCCURS ... DEPENDING ON ...` remains supported for COBOL-compatible externally described layouts.
+
+It is distinct from `OCCURS DYNAMIC`:
+
+- `OCCURS ... DEPENDING ON ...` describes a COBOL-style variable logical extent tied to another data item,
+- `OCCURS DYNAMIC` is a runtime-managed resizable array intended for normal Neo COBOL programming.
+
+The two forms normalize to different representation requirements even though both may have runtime-varying element counts.
 
 ## 3. Multidimensional data
 
@@ -61,7 +139,7 @@ Nested `OCCURS` declarations define multidimensional data, preserving COBOL's hi
         10 CELL TYPE INTEGER OCCURS 8.
 ```
 
-No separate bracket-based multidimensional type syntax is required.
+Dynamic dimensions may also be nested where the element type permits it. No separate bracket-based multidimensional type syntax is required.
 
 ## 4. Level 88 conditions
 
@@ -91,20 +169,21 @@ A future explicit closed-set marker may be added if ordinary level-88 declaratio
 
 For aggregate values, each field may define its own default. Aggregate construction syntax may additionally initialize fields explicitly when specified by the expression/object model.
 
-## 6. No redundant collection or enum syntax
+## 6. Collection design rule
 
-Neo COBOL does not initially add separate `ARRAY`, `LIST`, or `ENUM` declaration keywords when existing COBOL concepts can express the same intent clearly.
+Neo COBOL does not introduce a separate bracket-style core array syntax when `OCCURS` can express the same concept clearly.
 
-- arrays/tables use `OCCURS`,
+- fixed arrays use `OCCURS n`,
+- resizable arrays use `OCCURS DYNAMIC`,
+- externally described COBOL variable tables may use `OCCURS ... DEPENDING ON ...`,
 - records use level-number groups or reusable `STRUCT`,
 - named state predicates use level-88 condition names.
 
-Additional collection abstractions may later exist as library types without changing the core data-description grammar.
+Higher-level collections such as maps, sets, queues, and linked structures may be provided as library types rather than being confused with the core array model.
 
 ## 7. Open items
 
-- Exact syntax for resizing and appending to `OCCURS DYNAMIC`
-- Bounds-checking failure behavior
-- Closed-set marker for exhaustive level-88 groups, if needed
+- Exact general runtime-error integration for bounds failures
 - Aggregate literal/constructor syntax
+- Closed-set marker for exhaustive level-88 groups, if needed
 - ABI/layout rules for externally interoperable structures
