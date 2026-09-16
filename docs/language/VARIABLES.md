@@ -7,8 +7,8 @@ Status: Draft
 Traditional level-number declarations remain valid and may use Neo COBOL `TYPE` names.
 
 ```cobol
-01 AGE TYPE INT.
-01 NAME TYPE STR.
+01 AGE TYPE INTEGER.
+01 NAME TYPE STRING.
 ```
 
 ## 2. VAR
@@ -20,7 +20,7 @@ VAR COUNT VALUE 10.
 VAR NAME VALUE "KADOKA".
 ```
 
-Conceptually, the compiler infers `COUNT` as `INT` and `NAME` as `STR`.
+Conceptually, the compiler infers `COUNT` as `INTEGER` and `NAME` as `STRING`.
 
 `VAR` itself is not a runtime type.
 
