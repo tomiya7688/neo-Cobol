@@ -4,17 +4,24 @@ Status: Draft
 
 Neo COBOL keeps COBOL 2002-style named functions and adds first-class function values, anonymous functions, and closures.
 
+Common parameter passing is defined in [PARAMETERS.md](PARAMETERS.md).
+
 ## 1. Named functions
 
-Named functions use explicit English-oriented clauses.
+Named functions use COBOL-style `USING` and `RETURNING` clauses.
 
 ```cobol
-FUNCTION ADD-NUMBERS USING A B RETURNING RESULT
+FUNCTION ADD-NUMBERS
+    USING BY VALUE A
+          BY VALUE B
+    RETURNING RESULT
     COMPUTE RESULT = A + B
 END FUNCTION.
 ```
 
 Traditional `FUNCTION-ID.` forms remain valid where supported.
+
+When a passing mode is omitted, the parameter is `BY REFERENCE` according to the common parameter rules.
 
 ## 2. Anonymous functions
 
@@ -32,7 +39,7 @@ Preliminary grammar:
 
 ```ebnf
 anonymous-function = "FUNCTION",
-                     [ "USING", identifier, { identifier } ],
+                     [ "USING", parameter, { parameter } ],
                      [ "RETURNING", type-reference ],
                      statement-list,
                      "END", "FUNCTION" ;
@@ -73,9 +80,9 @@ MOVE FUNCTION USING VALUE
 TO IS-LARGE.
 ```
 
-`LIMIT` is captured by the closure.
-
 The runtime must keep required captured state alive for as long as the closure remains reachable.
+
+Capture follows the binding semantics defined in `VARIABLES.md`: mutable `VAR` bindings remain shared mutable bindings when captured, while `LET` bindings cannot be rebound through the closure.
 
 ## 5. Compatibility and lowering
 
@@ -85,9 +92,7 @@ When targeting traditional COBOL, the compiler may lower them to generated named
 
 ## 6. Open items
 
-- Exact capture-by-value/reference rules
-- Mutation of captured variables
 - Function overload interaction
 - Function signature variance
-- Callable invocation syntax in all contexts
+- Callable invocation syntax in all expression contexts
 - Lowering limits for COBOL targets
