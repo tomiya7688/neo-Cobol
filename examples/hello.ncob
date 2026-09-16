@@ -1,0 +1,3 @@
+*> First executable Neo COBOL compiler slice.
+PROGRAM-ID. HELLO.
+DISPLAY "HELLO WORLD".

@@ -16,28 +16,55 @@ Neo COBOL source code should read as naturally as practical as an English descri
 
 Natural readability is not only a style preference; it is a language-design acceptance criterion. New syntax should be evaluated not only for brevity and implementation cost, but also for whether a reader can understand its intent without mentally translating dense symbolic notation.
 
+## Compiler bootstrap
+
+The initial compiler is implemented in **Go** and lowers through a backend-independent **Neo IR (NIR)**. The first backend emits **C11**, which is then compiled by GCC, Clang, or another compatible C compiler.
+
+```text
+Neo COBOL -> Lexer -> Parser -> AST -> Sema -> NIR -> C11 -> native executable
+```
+
+The first executable slice supports `DISPLAY` with literal operands and provides:
+
+```text
+neoc check source.ncob
+neoc emit-c source.ncob
+neoc build source.ncob
+neoc run source.ncob
+neoc version
+```
+
+Try it with:
+
+```sh
+go run ./cmd/neoc run examples/hello.ncob
+```
+
+Compiler architecture is documented in `docs/compiler/ARCHITECTURE.md`.
+
 ## Planned toolchain
 
 Neo COBOL source may target multiple backends:
 
 ```text
-Neo COBOL
+Neo COBOL / NIR
   ├─> COBOL
   ├─> C (GCC / Clang)
   ├─> Bitlang
-  └─> Native Neo COBOL compiler pipeline
+  └─> future native / VM backends
 ```
 
-The exact compatibility level and lowering rules will be defined in `docs/language/SPECIFICATION.md`.
+The exact compatibility level and lowering rules are defined incrementally in `docs/language/` and `docs/compiler/`.
 
 ## Project status
 
-Early design phase. Syntax, type system, module model, compatibility rules, and compiler architecture are still under active specification.
+Early implementation and active language-design phase. The compiler skeleton is executable, while most language features remain under specification and implementation.
 
 See:
 
 - `docs/language/SPECIFICATION.md` — language specification draft
 - `docs/language/GRAMMAR.md` — grammar and EBNF draft
+- `docs/compiler/ARCHITECTURE.md` — compiler architecture and bootstrap scope
 - `ROADMAP.md` — implementation roadmap
 - GitHub Issues — individual design and implementation tasks
 

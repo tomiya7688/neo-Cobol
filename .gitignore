@@ -1,0 +1,6 @@
+/bin/
+/.neoc/
+/neoc
+*.exe
+*.obj
+*.o

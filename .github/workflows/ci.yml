@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build compiler
+        run: go build ./cmd/neoc
+      - name: Compile and run Hello World through C11 backend
+        run: |
+          go run ./cmd/neoc build -o /tmp/neo-hello examples/hello.ncob
+          test "$(/tmp/neo-hello)" = "HELLO WORLD"
