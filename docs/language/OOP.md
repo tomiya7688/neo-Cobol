@@ -251,7 +251,33 @@ Name conflicts introduced by multiple imported namespaces are compile-time error
 use-namespace = "USE", "NAMESPACE", qualified-name, sentence-terminator ;
 ```
 
-## 11. Preliminary modifier grammar
+## 11. Property convention
+
+Neo COBOL does not introduce a separate `PROPERTY` declaration syntax in the initial language.
+
+Property-like access is expressed with ordinary methods whose names use the `GET-` and `SET-` conventions.
+
+```cobol
+PUBLIC METHOD GET-NAME
+    RETURNING RESULT
+    MOVE NAME TO RESULT
+END METHOD.
+
+PUBLIC METHOD SET-NAME
+    USING VALUE
+    MOVE VALUE TO NAME
+END METHOD.
+```
+
+A getter uses normal `RETURNING` semantics. A setter uses normal `USING` parameter semantics.
+
+A `GET-*` method without a corresponding `SET-*` method represents read-only property-like access. A `SET-*` method without a corresponding `GET-*` method represents write-only property-like access.
+
+These are ordinary methods for access control, inheritance, interface contracts, `ABSTRACT`, `OVERRIDE`, and `SEALED` behavior. The compiler does not give `GET-*` or `SET-*` methods separate runtime dispatch semantics.
+
+Tools and IDEs may present a compatible `GET-X` / `SET-X` pair as a logical property named `X`, but that presentation is tooling metadata rather than a distinct language construct.
+
+## 12. Preliminary modifier grammar
 
 ```ebnf
 access-modifier = "PUBLIC" | "PRIVATE" | "PROTECTED" ;
@@ -259,7 +285,7 @@ class-modifier = access-modifier | "ABSTRACT" | "SEALED" ;
 member-modifier = access-modifier | "STATIC" | "ABSTRACT" | "OVERRIDE" | "SEALED" ;
 ```
 
-## 12. Preliminary class grammar
+## 13. Preliminary class grammar
 
 ```ebnf
 class-definition = { class-modifier }, "CLASS", identifier,
@@ -276,12 +302,12 @@ implements-clause = "IMPLEMENTS", qualified-name,
 
 Traditional `CLASS-ID.` and `METHOD-ID.` forms remain compatible forms and normalize into the same internal representation where supported.
 
-## 13. Open items
+## 14. Open items
 
 - Constructor/initialization semantics behind `CREATE ... USING ... AS ...`
 - Object lifetime and exact `DESTROY` semantics
 - Explicit casting syntax
 - Detailed inheritance conversion rules
 - Section-level visibility precedence
-- Interface default methods/properties/events policy
+- Interface default methods/events policy
 - Exact mapping to COBOL targets lacking equivalent modern OOP features
