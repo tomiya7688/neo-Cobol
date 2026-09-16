@@ -33,13 +33,15 @@ LET MAX-COUNT VALUE 100.
 LET TITLE VALUE "REPORT".
 ```
 
-The value referred to by a `LET` binding may still have its own mutability rules; `LET` guarantees that the binding itself is not reassigned.
+`LET` is the canonical Neo COBOL constant-binding mechanism for local values. A separate `CONST` keyword is not introduced because it would duplicate the same core meaning.
+
+The value referred to by a `LET` binding may still contain mutable referenced state; `LET` guarantees that the binding itself is not reassigned.
 
 `LET` itself is not a runtime type.
 
 ## 4. Inference rule
 
-Both forms require an initializer unless a later specification explicitly defines another inference source.
+Both forms require an initializer.
 
 ```ebnf
 var-declaration = "VAR", identifier, "VALUE", expression, sentence-terminator ;
@@ -47,6 +49,8 @@ let-declaration = "LET", identifier, "VALUE", expression, sentence-terminator ;
 ```
 
 Type inference must produce one deterministic logical type. Ambiguous inference is a compile-time error.
+
+Integer literals infer to `INTEGER` when the value fits 32 bits, otherwise `LONG` when it fits 64 bits. Decimal literals with a fractional component infer to `DECIMAL` unless an explicit floating-point suffix/form is later specified. String literals infer to `STRING`; `TRUE` and `FALSE` infer to `BOOLEAN`.
 
 ## 5. Assignment
 
@@ -60,12 +64,28 @@ Reassignment of a `LET` binding is a compile-time error.
 
 ## 6. Scope
 
-`VAR` and `LET` are intended primarily for local/block-scoped declarations. Exact class/member/global applicability remains to be specified separately.
+`VAR` and `LET` are block-scoped declarations.
 
-## 7. Open items
+An inner scope may shadow an outer binding only when the new declaration is explicit. The compiler should warn by default when shadowing could make code misleading.
 
-- Definite-assignment rules
-- Shadowing rules
-- Global/member use of `VAR` and `LET`
-- Destructuring, if added
-- Interaction with captured closure variables
+Class/member/global data continues to use explicit data-description declarations unless a later specification explicitly permits inferred member declarations.
+
+## 7. Definite assignment
+
+A binding must be definitely initialized before use.
+
+Because `VAR` and `LET` require an initializer, they satisfy this rule at declaration. Traditional declarations without an explicit `VALUE` follow the default-initialization rules of their declared type/data representation.
+
+## 8. Closures
+
+A closure may capture `VAR` or `LET` bindings.
+
+- captured `LET` bindings cannot be rebound,
+- captured `VAR` bindings preserve normal mutability,
+- the runtime must preserve captured storage for as long as the closure can access it.
+
+## 9. Open items
+
+- Whether inferred declarations are ever allowed for class/static members
+- Destructuring syntax, if later needed
+- Detailed lifetime optimization rules for captured locals
