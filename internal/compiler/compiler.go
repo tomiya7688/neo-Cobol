@@ -10,28 +10,36 @@ import (
 )
 
 func Check(source string) (*ast.Program, error) {
-	tokens, err := lexer.Lex(source)
+	program, err := parse(source)
 	if err != nil {
 		return nil, err
 	}
-	program, err := parser.Parse(tokens)
-	if err != nil {
-		return nil, err
-	}
-	if err := sema.Check(program); err != nil {
+	if _, err := sema.Check(program); err != nil {
 		return nil, err
 	}
 	return program, nil
 }
 
 func EmitC(source string) (string, error) {
-	program, err := Check(source)
+	program, err := parse(source)
 	if err != nil {
 		return "", err
 	}
-	ir, err := nir.Lower(program)
+	info, err := sema.Check(program)
+	if err != nil {
+		return "", err
+	}
+	ir, err := nir.Lower(program, info)
 	if err != nil {
 		return "", err
 	}
 	return cbackend.Emit(ir)
+}
+
+func parse(source string) (*ast.Program, error) {
+	tokens, err := lexer.Lex(source)
+	if err != nil {
+		return nil, err
+	}
+	return parser.Parse(tokens)
 }

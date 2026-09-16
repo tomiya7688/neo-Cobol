@@ -8,6 +8,8 @@ const (
 	String
 	Number
 	Period
+	LParen
+	RParen
 )
 
 type Token struct {
@@ -18,10 +20,7 @@ type Token struct {
 }
 
 func (t Token) IsWord(word string) bool {
-	if t.Kind != Identifier {
-		return false
-	}
-	if len(t.Lexeme) != len(word) {
+	if t.Kind != Identifier || len(t.Lexeme) != len(word) {
 		return false
 	}
 	for i := range t.Lexeme {

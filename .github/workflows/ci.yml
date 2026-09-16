@@ -26,3 +26,7 @@ jobs:
         run: |
           go run ./cmd/neoc build -o /tmp/neo-hello examples/hello.ncob
           test "$(/tmp/neo-hello)" = "HELLO WORLD"
+      - name: Compile and run variables through C11 backend
+        run: |
+          go run ./cmd/neoc build -o /tmp/neo-variables examples/variables.ncob
+          test "$(/tmp/neo-variables)" = "MARU 42"

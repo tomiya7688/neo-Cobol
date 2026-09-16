@@ -24,7 +24,7 @@ The initial compiler is implemented in **Go** and lowers through a backend-indep
 Neo COBOL -> Lexer -> Parser -> AST -> Sema -> NIR -> C11 -> native executable
 ```
 
-The first executable slice supports `DISPLAY` with literal operands and provides:
+The executable bootstrap currently supports literal `DISPLAY`, elementary level-01/77 data declarations, `TYPE`, an initial `PIC` subset, `VALUE`, symbol resolution, `MOVE`, and variable-backed `DISPLAY`.
 
 ```text
 neoc check source.ncob
@@ -38,9 +38,10 @@ Try it with:
 
 ```sh
 go run ./cmd/neoc run examples/hello.ncob
+go run ./cmd/neoc run examples/variables.ncob
 ```
 
-Compiler architecture is documented in `docs/compiler/ARCHITECTURE.md`.
+Compiler architecture and current bootstrap limitations are documented in `docs/compiler/ARCHITECTURE.md`.
 
 ## Planned toolchain
 
@@ -58,7 +59,7 @@ The exact compatibility level and lowering rules are defined incrementally in `d
 
 ## Project status
 
-Early implementation and active language-design phase. The compiler skeleton is executable, while most language features remain under specification and implementation.
+Early implementation and active language-design phase. The compiler has an executable end-to-end path, while most language features remain under specification and implementation.
 
 See:
 

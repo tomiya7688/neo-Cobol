@@ -1,23 +1,33 @@
 package ast
 
 type Program struct {
-	Name       string
-	Statements []Statement
+	Name         string
+	Declarations []DataDeclaration
+	Statements   []Statement
 }
 
-type Statement interface {
-	statementNode()
+type DataDeclaration struct {
+	Level       int
+	Name        string
+	TypeName    string
+	Picture     string
+	Initializer Expression
 }
 
-type DisplayStatement struct {
-	Values []Expression
-}
+type Statement interface{ statementNode() }
+
+type DisplayStatement struct{ Values []Expression }
 
 func (DisplayStatement) statementNode() {}
 
-type Expression interface {
-	expressionNode()
+type MoveStatement struct {
+	Source Expression
+	Target string
 }
+
+func (MoveStatement) statementNode() {}
+
+type Expression interface{ expressionNode() }
 
 type StringLiteral struct{ Value string }
 
@@ -26,6 +36,10 @@ func (StringLiteral) expressionNode() {}
 type NumberLiteral struct{ Value string }
 
 func (NumberLiteral) expressionNode() {}
+
+type BooleanLiteral struct{ Value bool }
+
+func (BooleanLiteral) expressionNode() {}
 
 type Identifier struct{ Name string }
 

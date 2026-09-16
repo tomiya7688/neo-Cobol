@@ -2,41 +2,117 @@ package nir
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/tomiya7688/neo-Cobol/internal/ast"
+	"github.com/tomiya7688/neo-Cobol/internal/sema"
+	"github.com/tomiya7688/neo-Cobol/internal/types"
 )
 
 type Program struct {
-	Name string
-	Ops  []Op
+	Name      string
+	Variables []Variable
+	Ops       []Op
+}
+
+type Variable struct {
+	Name    string
+	Type    types.Type
+	Initial *Value
+}
+
+type ValueKind uint8
+
+const (
+	LiteralValue ValueKind = iota
+	VariableValue
+)
+
+type Value struct {
+	Kind ValueKind
+	Type types.Kind
+	Text string
 }
 
 type Op interface{ opNode() }
 
-type Display struct{ Values []string }
+type Display struct{ Values []Value }
 
 func (Display) opNode() {}
 
-func Lower(program *ast.Program) (*Program, error) {
+type Move struct {
+	Source Value
+	Target string
+}
+
+func (Move) opNode() {}
+
+func Lower(program *ast.Program, info *sema.Info) (*Program, error) {
 	out := &Program{Name: program.Name}
+	for _, decl := range program.Declarations {
+		key := normalize(decl.Name)
+		symbol := info.Symbols[key]
+		variable := Variable{Name: key, Type: symbol.Type}
+		if decl.Initializer != nil {
+			value, err := lowerExpression(decl.Initializer, info)
+			if err != nil {
+				return nil, err
+			}
+			variable.Initial = &value
+		}
+		out.Variables = append(out.Variables, variable)
+	}
 	for _, statement := range program.Statements {
 		switch stmt := statement.(type) {
 		case ast.DisplayStatement:
 			op := Display{}
-			for _, value := range stmt.Values {
-				switch v := value.(type) {
-				case ast.StringLiteral:
-					op.Values = append(op.Values, v.Value)
-				case ast.NumberLiteral:
-					op.Values = append(op.Values, v.Value)
-				default:
-					return nil, fmt.Errorf("cannot lower expression node %T", value)
+			for _, expression := range stmt.Values {
+				value, err := lowerExpression(expression, info)
+				if err != nil {
+					return nil, err
 				}
+				op.Values = append(op.Values, value)
 			}
 			out.Ops = append(out.Ops, op)
+		case ast.MoveStatement:
+			value, err := lowerExpression(stmt.Source, info)
+			if err != nil {
+				return nil, err
+			}
+			out.Ops = append(out.Ops, Move{Source: value, Target: normalize(stmt.Target)})
 		default:
 			return nil, fmt.Errorf("cannot lower statement node %T", statement)
 		}
 	}
 	return out, nil
 }
+
+func lowerExpression(expr ast.Expression, info *sema.Info) (Value, error) {
+	switch value := expr.(type) {
+	case ast.StringLiteral:
+		return Value{Kind: LiteralValue, Type: types.String, Text: value.Value}, nil
+	case ast.BooleanLiteral:
+		text := "FALSE"
+		if value.Value {
+			text = "TRUE"
+		}
+		return Value{Kind: LiteralValue, Type: types.Boolean, Text: text}, nil
+	case ast.NumberLiteral:
+		kind, err := types.InferNumberLiteral(value.Value)
+		if err != nil {
+			return Value{}, err
+		}
+		return Value{Kind: LiteralValue, Type: kind, Text: value.Value}, nil
+	case ast.Identifier:
+		key := normalize(value.Name)
+		symbol, ok := info.Symbols[key]
+		if !ok {
+			return Value{}, fmt.Errorf("cannot lower unknown identifier %q", value.Name)
+		}
+		return Value{Kind: VariableValue, Type: symbol.Type.Kind, Text: key}, nil
+	default:
+		return Value{}, fmt.Errorf("cannot lower expression node %T", expr)
+	}
+}
+
+func normalize(name string) string { return strings.ToUpper(name) }
