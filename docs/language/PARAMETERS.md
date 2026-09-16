@@ -14,6 +14,7 @@ RETURNING
 BY REFERENCE
 BY VALUE
 OPTIONAL
+VALUE
 ```
 
 `USING` declares or supplies arguments. `RETURNING` declares the result value.
@@ -61,22 +62,35 @@ A callee may modify the referenced value when the parameter and target are writa
 
 Passing a non-reassignable `LET` binding by reference does not make the binding itself reassignable.
 
-## 5. OPTIONAL
+## 5. Positional arguments
+
+Neo COBOL uses positional arguments as the canonical calling model.
+
+Named arguments using a separate syntax such as `NAME = VALUE` are not part of the core language.
+
+This keeps callable syntax aligned with traditional COBOL `USING` conventions and avoids introducing a second argument-binding model.
+
+## 6. OPTIONAL and default values
 
 `OPTIONAL` marks a parameter that may be omitted by the caller.
 
+A default value may be specified using the existing COBOL-style `VALUE` vocabulary.
+
 ```cobol
-METHOD WRITE-REPORT
-    USING REPORT
-          OPTIONAL FORMATTER
+METHOD FIND-CUSTOMER
+    USING CUSTOMER-ID
+          OPTIONAL LIMIT VALUE 100
+    RETURNING RESULT
 END METHOD.
 ```
 
-Omitted optional arguments receive their declared default when one exists; otherwise they use the type-defined absent/default behavior specified for that callable declaration.
+When `LIMIT` is omitted, its value is `100`.
 
-Required parameters must precede optional parameters unless a later named-argument rule explicitly permits another ordering.
+Required parameters must precede optional parameters.
 
-## 6. RETURNING
+If an `OPTIONAL` parameter has no explicit `VALUE`, the callable may observe its omitted state according to the parameter/type rules. The exact representation of that omitted state is an implementation detail and must not be confused with `NULL` unless the declared type is nullable.
+
+## 7. RETURNING
 
 A callable has at most one direct `RETURNING` result.
 
@@ -89,7 +103,7 @@ END FUNCTION.
 
 Multiple logical results should use a `STRUCT`, record, class, or explicit reference parameters rather than introducing a second incompatible return mechanism.
 
-## 7. Common use across callables
+## 8. Common use across callables
 
 The same rules apply to:
 
@@ -101,12 +115,19 @@ The same rules apply to:
 
 Constructors therefore reuse `USING` parameter semantics rather than defining a separate constructor-argument system.
 
-## 8. Compatibility
+## 9. External ABI
+
+Neo COBOL source keeps the same `USING`, `RETURNING`, `BY VALUE`, and `BY REFERENCE` vocabulary when interoperating with external COBOL or C code.
+
+Target-specific ABI details such as register usage, stack layout, symbol decoration, and native calling convention selection are backend concerns.
+
+Backends must preserve the observable Neo COBOL parameter semantics and must not require source-level syntax to change merely because the selected target uses a different ABI.
+
+## 10. Compatibility
 
 Traditional COBOL parameter forms remain valid where applicable. Neo COBOL normalizes compatible traditional and object-oriented forms to one internal parameter model.
 
-## 9. Open items
+## 11. Open items
 
-- Named-argument syntax, if added
-- Exact interaction of `OPTIONAL` with explicit default values
-- External ABI details for COBOL/C interop
+- Detailed omitted-state inspection syntax for `OPTIONAL` parameters without `VALUE`
+- Backend-specific COBOL/C interop mapping details
