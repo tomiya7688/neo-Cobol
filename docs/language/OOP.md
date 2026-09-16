@@ -230,7 +230,26 @@ Namespace components are case-insensitive identifiers. A `.` between valid names
 qualified-name = identifier, { ".", identifier } ;
 ```
 
-Import/use syntax remains open.
+Namespaces are imported with `USE NAMESPACE`:
+
+```cobol
+USE NAMESPACE COMPANY.CUSTOMER.
+USE NAMESPACE COMPANY.ACCOUNT.
+```
+
+`USE NAMESPACE` makes the public declarations of the target namespace available for unqualified name lookup within the current compilation scope.
+
+Neo COBOL does not initially provide a separate single-symbol import syntax. Code may either use `USE NAMESPACE` or refer to a declaration by its fully qualified name.
+
+```cobol
+01 CURRENT-CUSTOMER TYPE COMPANY.CUSTOMER.CUSTOMER.
+```
+
+Name conflicts introduced by multiple imported namespaces are compile-time errors unless the use site gives a fully qualified name.
+
+```ebnf
+use-namespace = "USE", "NAMESPACE", qualified-name, sentence-terminator ;
+```
 
 ## 11. Preliminary modifier grammar
 
@@ -265,5 +284,4 @@ Traditional `CLASS-ID.` and `METHOD-ID.` forms remain compatible forms and norma
 - Detailed inheritance conversion rules
 - Section-level visibility precedence
 - Interface default methods/properties/events policy
-- Namespace import/use syntax
 - Exact mapping to COBOL targets lacking equivalent modern OOP features
