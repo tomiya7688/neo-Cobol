@@ -15,21 +15,39 @@ Neo COBOL should:
 1. Read naturally as English where practical.
 2. Preserve established COBOL syntax by default.
 3. Prefer explicit intent over symbolic terseness.
-4. Support deterministic parsing and tooling.
-5. Be suitable for static analysis and automated review.
-6. Support down-compilation to COBOL for a defined compatibility subset.
-7. Support a native compiler pipeline.
-8. Support transpilation to Bitlang.
-9. Support a C backend suitable for GCC and Clang.
-10. Extend the COBOL 2002 object model with modern features without discarding COBOL's character.
+4. Prefer COBOL-like or full English terminology when multiple spellings have the same meaning.
+5. Modernize runtime semantics and type behavior without needlessly replacing COBOL-style source syntax.
+6. Support deterministic parsing and tooling.
+7. Be suitable for static analysis and automated review.
+8. Support down-compilation to COBOL for a defined compatibility subset.
+9. Support a native compiler pipeline.
+10. Support transpilation to Bitlang.
+11. Support a C backend suitable for GCC and Clang.
+12. Extend the COBOL 2002 object model with modern features without discarding COBOL's character.
 
-## 3. Readability acceptance criterion
+## 3. Modernization principle
+
+Neo COBOL separates source-language style from runtime modernization.
+
+The default rule is:
+
+```text
+Syntax and naming  -> COBOL-like / English-readable
+Runtime semantics  -> modern and deterministic
+Machine type widths -> modern fixed-width model
+```
+
+For example, `INTEGER` is preferred over an abbreviated `INT`, while its language-level size is defined as a modern fixed-width 32-bit signed integer rather than inheriting an implementation-dependent machine integer size.
+
+Likewise, modern facilities such as classes, interfaces, first-class functions, closures, inferred variables, and fixed-width numeric types should be expressed using vocabulary and structure that remain recognizably COBOL-like.
+
+## 4. Readability acceptance criterion
 
 A proposed syntax feature should normally be rejected or redesigned when it makes valid source code substantially harder to read as an English description of program intent without providing a compelling technical benefit.
 
 This does not require grammatically perfect English. Compiler determinism, compatibility, unambiguous grammar, and implementation safety take precedence where natural phrasing would introduce ambiguity.
 
-## 4. Compatibility model
+## 5. Compatibility model
 
 Compatibility with historical COBOL is defined explicitly rather than assumed.
 
@@ -41,7 +59,7 @@ The specification distinguishes:
 
 When a Neo shorthand conflicts with an established COBOL interpretation, the COBOL interpretation takes precedence unless Neo COBOL explicitly defines otherwise.
 
-## 5. Compilation targets
+## 6. Compilation targets
 
 Planned targets:
 
@@ -50,7 +68,7 @@ Planned targets:
 - Bitlang
 - Native Neo COBOL compiler pipeline
 
-## 6. Language specification files
+## 7. Language specification files
 
 The language specification is intentionally split by concern.
 
@@ -59,13 +77,15 @@ The language specification is intentionally split by concern.
 - [`LEXICAL.md`](LEXICAL.md) — case, identifiers, comments, literals, and periods.
 - [`PROGRAM_STRUCTURE.md`](PROGRAM_STRUCTURE.md) — divisions, sections, inference, and normalization.
 - [`STATEMENTS.md`](STATEMENTS.md) — executable statements, conditions, control flow, and error phrases.
-- [`TYPES.md`](TYPES.md) — current type-system decisions, including Boolean/null/reference/function types.
+- [`TYPES.md`](TYPES.md) — built-in, reference, aggregate, and function types.
+- [`PIC.md`](PIC.md) — integration of `TYPE` with traditional `PIC` representation constraints.
+- [`VARIABLES.md`](VARIABLES.md) — explicit declarations plus `VAR` and `LET` inference bindings.
 - [`OOP.md`](OOP.md) — classes, inheritance, interfaces, namespaces, visibility, modifiers, creation, and destruction.
 - [`FUNCTIONS.md`](FUNCTIONS.md) — named/anonymous functions, first-class callables, and closures.
 
 Compiler-specific language tooling is documented separately under `docs/compiler/`, including [`../compiler/FORMATTER.md`](../compiler/FORMATTER.md).
 
-## 7. Current language direction
+## 8. Current language direction
 
 The following points are already established at draft level:
 
@@ -85,8 +105,9 @@ The following points are already established at draft level:
 - Anonymous functions use `FUNCTION ... END FUNCTION` rather than symbolic lambda syntax.
 - Closures and first-class function values are part of the language direction.
 - Function types use the same `FUNCTION / USING / RETURNING` vocabulary as callable definitions.
+- Built-in numeric types use modern fixed widths while retaining COBOL-like full-word names.
 
-## 8. Normalization philosophy
+## 9. Normalization philosophy
 
 Neo COBOL source should normalize mechanically into a smaller canonical AST wherever practical.
 
@@ -99,6 +120,6 @@ Examples include:
 
 The compiler should reject ambiguous shorthand rather than guess.
 
-## 9. Versioning
+## 10. Versioning
 
 The specification will use explicit language revisions once the first grammar and core type system stabilize. Until then, these documents remain working drafts.
