@@ -67,9 +67,12 @@ The bootstrap compiler currently supports:
 - case-insensitive symbol resolution and duplicate-name diagnostics
 - definite-initialization checks for the implemented statement flow
 - static type compatibility checks and literal PIC-bound checks
-- `MOVE value TO variable`
+- `VAR name VALUE expression` mutable inferred local bindings
+- `LET name VALUE expression` non-reassignable inferred local bindings
+- inference from string, Boolean, INTEGER/LONG numeric, DECIMAL, or already-declared initialized values
+- `MOVE value TO variable`, including rejection of reassignment to `LET`
 - `DISPLAY` with literals and declared variables
-- NIR lowering
+- NIR declaration operations that preserve the runtime position of local binding initializers
 - C11 emission
 - `neoc check`, `emit-c`, `build`, `run`, and `version`
 
@@ -83,13 +86,15 @@ The semantic layer can validate the initial `DECIMAL`/PIC model, but exact decim
 
 Fixed-width string and numeric PICs currently provide compile-time representation constraints for literal assignments. Full COBOL field padding/truncation and runtime PIC conversion semantics are not implemented yet.
 
-`VAR` and `LET` remain declarations/inference features to implement; they are not primitive runtime types.
+`VAR` and `LET` infer one logical type from their initializer. Their declaration remains in NIR execution order instead of being hoisted, so an initializer observes values as they exist at the declaration point. `LET` immutability is enforced by semantic analysis rather than relying on backend-specific storage qualifiers.
 
-## Data-model boundary
+## Data-model and scope boundary
 
 Only elementary level-01 and level-77 items are executable in the current slice. Levels 02-49 are recognized as level numbers but rejected until record hierarchy semantics are implemented. This avoids incorrectly flattening nested COBOL records.
 
-Traditional declarations must precede executable statements in the current source-unit implementation.
+Traditional declarations must precede executable or procedure-local binding statements in the current source-unit implementation.
+
+The current executable slice has one procedure-local binding scope. The language specification defines `VAR` and `LET` as block-scoped; nested scopes and explicit shadowing behavior will be implemented with block statements such as `IF` and `PERFORM`, rather than pretending that a flat symbol table already provides full block-scope semantics.
 
 ## Runtime boundary
 
@@ -109,10 +114,9 @@ neoc version
 
 ## Next implementation slices
 
-1. `VAR` / `LET` inferred local bindings and mutability checks.
-2. Conditions and `IF`.
-3. Record hierarchy and additional traditional data-description entries.
-4. `OCCURS` and dynamic-array lowering.
-5. Functions, classes, interfaces, inheritance, and closures.
-6. COBOL and Bitlang backends.
-7. Expanded runtime and backend-equivalence/conformance tests.
+1. Conditions, `IF`, and nested local scopes.
+2. Record hierarchy and additional traditional data-description entries.
+3. `OCCURS` and dynamic-array lowering.
+4. Functions, classes, interfaces, inheritance, and closures.
+5. COBOL and Bitlang backends.
+6. Expanded runtime and backend-equivalence/conformance tests.

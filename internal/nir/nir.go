@@ -19,6 +19,7 @@ type Variable struct {
 	Name    string
 	Type    types.Type
 	Initial *Value
+	Mutable bool
 }
 
 type ValueKind uint8
@@ -36,6 +37,15 @@ type Value struct {
 
 type Op interface{ opNode() }
 
+type Declare struct {
+	Name    string
+	Type    types.Type
+	Initial Value
+	Mutable bool
+}
+
+func (Declare) opNode() {}
+
 type Display struct{ Values []Value }
 
 func (Display) opNode() {}
@@ -52,7 +62,7 @@ func Lower(program *ast.Program, info *sema.Info) (*Program, error) {
 	for _, decl := range program.Declarations {
 		key := normalize(decl.Name)
 		symbol := info.Symbols[key]
-		variable := Variable{Name: key, Type: symbol.Type}
+		variable := Variable{Name: key, Type: symbol.Type, Mutable: true}
 		if decl.Initializer != nil {
 			value, err := lowerExpression(decl.Initializer, info)
 			if err != nil {
@@ -64,6 +74,17 @@ func Lower(program *ast.Program, info *sema.Info) (*Program, error) {
 	}
 	for _, statement := range program.Statements {
 		switch stmt := statement.(type) {
+		case ast.BindingDeclaration:
+			key := normalize(stmt.Name)
+			symbol, ok := info.Symbols[key]
+			if !ok {
+				return nil, fmt.Errorf("cannot lower unknown binding %q", stmt.Name)
+			}
+			value, err := lowerExpression(stmt.Initializer, info)
+			if err != nil {
+				return nil, err
+			}
+			out.Ops = append(out.Ops, Declare{Name: key, Type: symbol.Type, Initial: value, Mutable: stmt.Mutable})
 		case ast.DisplayStatement:
 			op := Display{}
 			for _, expression := range stmt.Values {

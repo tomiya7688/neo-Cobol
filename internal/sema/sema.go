@@ -11,8 +11,9 @@ import (
 )
 
 type Symbol struct {
-	Name string
-	Type types.Type
+	Name    string
+	Type    types.Type
+	Mutable bool
 }
 
 type Info struct {
@@ -42,11 +43,26 @@ func Check(program *ast.Program) (*Info, error) {
 			}
 			initialized[key] = true
 		}
-		info.Symbols[key] = Symbol{Name: decl.Name, Type: typeInfo}
+		info.Symbols[key] = Symbol{Name: decl.Name, Type: typeInfo, Mutable: true}
 	}
 
 	for _, statement := range program.Statements {
 		switch stmt := statement.(type) {
+		case ast.BindingDeclaration:
+			key := normalize(stmt.Name)
+			if _, exists := info.Symbols[key]; exists {
+				return nil, fmt.Errorf("duplicate declaration of %q", stmt.Name)
+			}
+			kind, err := expressionType(stmt.Initializer, info, initialized, true)
+			if err != nil {
+				return nil, fmt.Errorf("%s VALUE: %w", stmt.Name, err)
+			}
+			info.Symbols[key] = Symbol{
+				Name:    stmt.Name,
+				Type:    types.Type{Kind: kind},
+				Mutable: stmt.Mutable,
+			}
+			initialized[key] = true
 		case ast.DisplayStatement:
 			for _, value := range stmt.Values {
 				if _, err := expressionType(value, info, initialized, true); err != nil {
@@ -58,6 +74,9 @@ func Check(program *ast.Program) (*Info, error) {
 			target, ok := info.Symbols[targetKey]
 			if !ok {
 				return nil, fmt.Errorf("MOVE target %q is not declared", stmt.Target)
+			}
+			if !target.Mutable {
+				return nil, fmt.Errorf("MOVE target %q is a LET binding and cannot be reassigned", stmt.Target)
 			}
 			if err := checkAssignmentValue(stmt.Source, target.Type, info, initialized); err != nil {
 				return nil, fmt.Errorf("MOVE to %s: %w", stmt.Target, err)

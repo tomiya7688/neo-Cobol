@@ -30,3 +30,8 @@ jobs:
         run: |
           go run ./cmd/neoc build -o /tmp/neo-variables examples/variables.ncob
           test "$(/tmp/neo-variables)" = "MARU 42"
+      - name: Compile and run VAR and LET bindings through C11 backend
+        run: |
+          go run ./cmd/neoc build -o /tmp/neo-bindings examples/bindings.ncob
+          test "$(/tmp/neo-bindings)" = $'SNAPSHOT=2
+VAR=3'

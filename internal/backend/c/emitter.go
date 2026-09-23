@@ -16,8 +16,10 @@ func Emit(program *nir.Program) (string, error) {
 	b.WriteString("int main(void) {\n")
 
 	cNames := make(map[string]string, len(program.Variables))
-	for i, variable := range program.Variables {
-		cName := fmt.Sprintf("neo_v_%d", i)
+	nextID := 0
+	for _, variable := range program.Variables {
+		cName := fmt.Sprintf("neo_v_%d", nextID)
+		nextID++
 		cNames[variable.Name] = cName
 		cType, err := cType(variable.Type.Kind)
 		if err != nil {
@@ -38,6 +40,22 @@ func Emit(program *nir.Program) (string, error) {
 
 	for _, operation := range program.Ops {
 		switch op := operation.(type) {
+		case nir.Declare:
+			if _, exists := cNames[op.Name]; exists {
+				return "", fmt.Errorf("C backend duplicate variable %s", op.Name)
+			}
+			initial, err := emitValue(op.Initial, cNames)
+			if err != nil {
+				return "", err
+			}
+			declType, err := cType(op.Type.Kind)
+			if err != nil {
+				return "", fmt.Errorf("binding %s: %w", op.Name, err)
+			}
+			cName := fmt.Sprintf("neo_v_%d", nextID)
+			nextID++
+			cNames[op.Name] = cName
+			fmt.Fprintf(&b, "    %s %s = %s;\n", declType, cName, initial)
 		case nir.Display:
 			for _, value := range op.Values {
 				if err := emitDisplay(&b, value, cNames); err != nil {

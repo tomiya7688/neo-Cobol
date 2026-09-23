@@ -50,6 +50,13 @@ func Parse(tokens []token.Token) (*ast.Program, error) {
 				return nil, err
 			}
 			program.Declarations = append(program.Declarations, decl)
+		case p.current().IsWord("VAR"), p.current().IsWord("LET"):
+			seenExecutable = true
+			stmt, err := p.parseBindingDeclaration()
+			if err != nil {
+				return nil, err
+			}
+			program.Statements = append(program.Statements, stmt)
 		case p.current().IsWord("DISPLAY"):
 			seenExecutable = true
 			stmt, err := p.parseDisplay()
@@ -157,6 +164,27 @@ func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 		return decl, err
 	}
 	return decl, nil
+}
+
+func (p *parser) parseBindingDeclaration() (ast.Statement, error) {
+	keyword := p.advance()
+	mutable := keyword.IsWord("VAR")
+	if p.current().Kind != token.Identifier {
+		return nil, p.expected("binding name after " + strings.ToUpper(keyword.Lexeme))
+	}
+	name := p.advance().Lexeme
+	if !p.current().IsWord("VALUE") {
+		return nil, p.expected("VALUE in " + strings.ToUpper(keyword.Lexeme) + " declaration")
+	}
+	p.advance()
+	initializer, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	if p.current().Kind == token.Period {
+		p.advance()
+	}
+	return ast.BindingDeclaration{Name: name, Mutable: mutable, Initializer: initializer}, nil
 }
 
 func (p *parser) parseDisplay() (ast.Statement, error) {

@@ -24,7 +24,7 @@ The initial compiler is implemented in **Go** and lowers through a backend-indep
 Neo COBOL -> Lexer -> Parser -> AST -> Sema -> NIR -> C11 -> native executable
 ```
 
-The executable bootstrap currently supports literal `DISPLAY`, elementary level-01/77 data declarations, `TYPE`, an initial `PIC` subset, `VALUE`, symbol resolution, `MOVE`, and variable-backed `DISPLAY`.
+The executable bootstrap currently supports literal `DISPLAY`, elementary level-01/77 data declarations, `TYPE`, an initial `PIC` subset, `VALUE`, symbol resolution, `MOVE`, variable-backed `DISPLAY`, and inferred local `VAR` / `LET` bindings.
 
 ```text
 neoc check source.ncob
@@ -39,6 +39,7 @@ Try it with:
 ```sh
 go run ./cmd/neoc run examples/hello.ncob
 go run ./cmd/neoc run examples/variables.ncob
+go run ./cmd/neoc run examples/bindings.ncob
 ```
 
 Compiler architecture and current bootstrap limitations are documented in `docs/compiler/ARCHITECTURE.md`.

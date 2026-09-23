@@ -16,6 +16,14 @@ type DataDeclaration struct {
 
 type Statement interface{ statementNode() }
 
+type BindingDeclaration struct {
+	Name        string
+	Mutable     bool
+	Initializer Expression
+}
+
+func (BindingDeclaration) statementNode() {}
+
 type DisplayStatement struct{ Values []Expression }
 
 func (DisplayStatement) statementNode() {}
