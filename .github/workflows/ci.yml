@@ -33,5 +33,4 @@ jobs:
       - name: Compile and run VAR and LET bindings through C11 backend
         run: |
           go run ./cmd/neoc build -o /tmp/neo-bindings examples/bindings.ncob
-          test "$(/tmp/neo-bindings)" = $'SNAPSHOT=2
-VAR=3'
+          test "$(/tmp/neo-bindings)" = $'SNAPSHOT=2\nVAR=3'
