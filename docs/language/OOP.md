@@ -302,9 +302,58 @@ implements-clause = "IMPLEMENTS", qualified-name,
 
 Traditional `CLASS-ID.` and `METHOD-ID.` forms remain compatible forms and normalize into the same internal representation where supported.
 
-## 14. Open items
 
-- Constructor/initialization semantics behind `CREATE ... USING ... AS ...`
+## 14. Method overloading
+
+Neo COBOL permits method overloading by method name plus parameter signature.
+
+Two methods may share a name when their parameter signatures are distinguishable.
+
+```cobol
+METHOD FIND
+    USING CUSTOMER-ID
+END METHOD.
+
+METHOD FIND
+    USING CUSTOMER-NAME
+END METHOD.
+```
+
+The return type is not part of overload resolution. Two overloads that differ only by `RETURNING` type are invalid because the call site would be ambiguous.
+
+Parameter passing modes and optional parameters follow `PARAMETERS.md`.
+
+## 15. Object initialization
+
+Neo COBOL does not introduce a separate `CONSTRUCTOR` declaration keyword. Object creation continues to use:
+
+```cobol
+CREATE CUSTOMER AS CUSTOMER-OBJECT.
+CREATE CUSTOMER USING NAME AGE AS CUSTOMER-OBJECT.
+```
+
+Class initialization logic is declared as an ordinary method named `INITIALIZE`.
+
+```cobol
+CLASS CUSTOMER.
+
+METHOD INITIALIZE
+    USING NAME AGE
+    MOVE NAME TO CUSTOMER-NAME
+    MOVE AGE TO CUSTOMER-AGE
+END METHOD.
+
+END CLASS CUSTOMER.
+```
+
+`CREATE CLASS-NAME USING ... AS ...` selects a compatible `INITIALIZE` overload using the normal method overload rules. `CREATE CLASS-NAME AS ...` selects a parameterless `INITIALIZE` when one exists.
+
+A class may omit `INITIALIZE` when no explicit initialization logic is required. In that case, parameterless creation remains valid and uses the type-defined default initialization of its members.
+
+`INITIALIZE` is reserved as the object-initialization method name for this purpose. It remains subject to the ordinary method parameter model, but is invoked by `CREATE` rather than requiring a separate constructor-call syntax.
+
+## 16. Open items
+
 - Object lifetime and exact `DESTROY` semantics
 - Explicit casting syntax
 - Detailed inheritance conversion rules
