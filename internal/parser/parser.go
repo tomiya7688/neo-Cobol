@@ -2,11 +2,10 @@ package parser
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/tomiya7688/neo-Cobol/internal/ast"
 	"github.com/tomiya7688/neo-Cobol/internal/token"
+	"strconv"
+	"strings"
 )
 
 type parser struct {
@@ -50,35 +49,32 @@ func Parse(tokens []token.Token) (*ast.Program, error) {
 				return nil, err
 			}
 			program.Declarations = append(program.Declarations, decl)
-		case p.current().IsWord("VAR"), p.current().IsWord("LET"):
-			seenExecutable = true
-			stmt, err := p.parseBindingDeclaration()
-			if err != nil {
-				return nil, err
-			}
-			program.Statements = append(program.Statements, stmt)
-		case p.current().IsWord("DISPLAY"):
-			seenExecutable = true
-			stmt, err := p.parseDisplay()
-			if err != nil {
-				return nil, err
-			}
-			program.Statements = append(program.Statements, stmt)
-		case p.current().IsWord("MOVE"):
-			seenExecutable = true
-			stmt, err := p.parseMove()
-			if err != nil {
-				return nil, err
-			}
-			program.Statements = append(program.Statements, stmt)
 		default:
-			t := p.current()
-			return nil, fmt.Errorf("%d:%d: unsupported syntax starting at %q", t.Line, t.Column, t.Lexeme)
+			seenExecutable = true
+			stmt, err := p.parseStatement()
+			if err != nil {
+				return nil, err
+			}
+			program.Statements = append(program.Statements, stmt)
 		}
 	}
 	return program, nil
 }
-
+func (p *parser) parseStatement() (ast.Statement, error) {
+	switch {
+	case p.current().IsWord("VAR"), p.current().IsWord("LET"):
+		return p.parseBindingDeclaration()
+	case p.current().IsWord("DISPLAY"):
+		return p.parseDisplay()
+	case p.current().IsWord("MOVE"):
+		return p.parseMove()
+	case p.current().IsWord("IF"):
+		return p.parseIf()
+	default:
+		t := p.current()
+		return nil, fmt.Errorf("%d:%d: unsupported statement starting at %q", t.Line, t.Column, t.Lexeme)
+	}
+}
 func (p *parser) parseDivisionHeader(name string) error {
 	p.advance()
 	if !p.current().IsWord("DIVISION") {
@@ -87,7 +83,6 @@ func (p *parser) parseDivisionHeader(name string) error {
 	p.advance()
 	return p.requirePeriod(name + " DIVISION")
 }
-
 func (p *parser) parseSectionHeader(name string) error {
 	p.advance()
 	if !p.current().IsWord("SECTION") {
@@ -96,7 +91,6 @@ func (p *parser) parseSectionHeader(name string) error {
 	p.advance()
 	return p.requirePeriod(name + " SECTION")
 }
-
 func (p *parser) parseProgramID(program *ast.Program) error {
 	p.advance()
 	if p.current().Kind != token.Period {
@@ -109,7 +103,6 @@ func (p *parser) parseProgramID(program *ast.Program) error {
 	program.Name = p.advance().Lexeme
 	return p.requirePeriod("program name")
 }
-
 func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 	levelToken := p.advance()
 	level, _ := strconv.Atoi(levelToken.Lexeme)
@@ -118,7 +111,6 @@ func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 		return decl, p.expected("data name after level number")
 	}
 	decl.Name = p.advance().Lexeme
-
 	if p.current().IsWord("TYPE") {
 		p.advance()
 		if p.current().Kind != token.Identifier {
@@ -165,7 +157,6 @@ func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 	}
 	return decl, nil
 }
-
 func (p *parser) parseBindingDeclaration() (ast.Statement, error) {
 	keyword := p.advance()
 	mutable := keyword.IsWord("VAR")
@@ -181,16 +172,16 @@ func (p *parser) parseBindingDeclaration() (ast.Statement, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.current().Kind == token.Period {
-		p.advance()
-	}
+	p.consumeOptionalPeriod()
 	return ast.BindingDeclaration{Name: name, Mutable: mutable, Initializer: initializer}, nil
 }
-
 func (p *parser) parseDisplay() (ast.Statement, error) {
 	p.advance()
 	stmt := ast.DisplayStatement{}
-	for p.current().Kind != token.Period && p.current().Kind != token.EOF {
+	for p.current().Kind != token.Period && p.current().Kind != token.EOF && !p.atBlockBoundary() {
+		if len(stmt.Values) > 0 && p.isStatementStart() {
+			break
+		}
 		expr, err := p.parseExpression()
 		if err != nil {
 			return nil, err
@@ -200,12 +191,9 @@ func (p *parser) parseDisplay() (ast.Statement, error) {
 	if len(stmt.Values) == 0 {
 		return nil, p.expected("at least one DISPLAY operand")
 	}
-	if p.current().Kind == token.Period {
-		p.advance()
-	}
+	p.consumeOptionalPeriod()
 	return stmt, nil
 }
-
 func (p *parser) parseMove() (ast.Statement, error) {
 	p.advance()
 	source, err := p.parseExpression()
@@ -220,12 +208,178 @@ func (p *parser) parseMove() (ast.Statement, error) {
 		return nil, p.expected("target identifier after TO")
 	}
 	target := p.advance().Lexeme
-	if p.current().Kind == token.Period {
-		p.advance()
-	}
+	p.consumeOptionalPeriod()
 	return ast.MoveStatement{Source: source, Target: target}, nil
 }
-
+func (p *parser) parseIf() (ast.Statement, error) {
+	p.advance()
+	condition, err := p.parseCondition()
+	if err != nil {
+		return nil, err
+	}
+	thenBlock, err := p.parseBlock(true)
+	if err != nil {
+		return nil, err
+	}
+	var elseBlock []ast.Statement
+	if p.current().IsWord("ELSE") {
+		p.advance()
+		elseBlock, err = p.parseBlock(false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if p.current().IsWord("END-IF") {
+		p.advance()
+	} else if p.current().IsWord("END") && p.peekWord(1, "IF") {
+		p.advance()
+		p.advance()
+	} else {
+		return nil, p.expected("END-IF")
+	}
+	p.consumeOptionalPeriod()
+	return ast.IfStatement{Condition: condition, Then: thenBlock, Else: elseBlock}, nil
+}
+func (p *parser) parseBlock(stopAtElse bool) ([]ast.Statement, error) {
+	var out []ast.Statement
+	for !p.atEnd() {
+		if p.current().IsWord("END-IF") || (p.current().IsWord("END") && p.peekWord(1, "IF")) {
+			return out, nil
+		}
+		if stopAtElse && p.current().IsWord("ELSE") {
+			return out, nil
+		}
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, stmt)
+	}
+	return nil, p.expected("END-IF")
+}
+func (p *parser) parseCondition() (ast.Condition, error) { return p.parseOrCondition() }
+func (p *parser) parseOrCondition() (ast.Condition, error) {
+	left, err := p.parseAndCondition()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().IsWord("OR") {
+		p.advance()
+		right, err := p.parseAndCondition()
+		if err != nil {
+			return nil, err
+		}
+		left = ast.LogicalCondition{Left: left, Op: ast.LogicalOr, Right: right}
+	}
+	return left, nil
+}
+func (p *parser) parseAndCondition() (ast.Condition, error) {
+	left, err := p.parseNotCondition()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().IsWord("AND") {
+		p.advance()
+		right, err := p.parseNotCondition()
+		if err != nil {
+			return nil, err
+		}
+		left = ast.LogicalCondition{Left: left, Op: ast.LogicalAnd, Right: right}
+	}
+	return left, nil
+}
+func (p *parser) parseNotCondition() (ast.Condition, error) {
+	if p.current().IsWord("NOT") {
+		p.advance()
+		inner, err := p.parseNotCondition()
+		if err != nil {
+			return nil, err
+		}
+		return ast.NotCondition{Inner: inner}, nil
+	}
+	return p.parsePredicateCondition()
+}
+func (p *parser) parsePredicateCondition() (ast.Condition, error) {
+	if p.current().Kind == token.LParen {
+		p.advance()
+		inner, err := p.parseCondition()
+		if err != nil {
+			return nil, err
+		}
+		if p.current().Kind != token.RParen {
+			return nil, p.expected("')' after condition")
+		}
+		p.advance()
+		return inner, nil
+	}
+	left, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.current().IsWord("IS") {
+		return ast.ValueCondition{Value: left}, nil
+	}
+	op, err := p.parseComparisonOperator()
+	if err != nil {
+		return nil, err
+	}
+	right, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+	return ast.ComparisonCondition{Left: left, Op: op, Right: right}, nil
+}
+func (p *parser) parseComparisonOperator() (ast.ComparisonOperator, error) {
+	p.advance()
+	if p.current().IsWord("NOT") {
+		p.advance()
+		if !p.current().IsWord("EQUAL") {
+			return 0, p.expected("EQUAL after IS NOT")
+		}
+		p.advance()
+		if !p.current().IsWord("TO") {
+			return 0, p.expected("TO after IS NOT EQUAL")
+		}
+		p.advance()
+		return ast.CompareNotEqual, nil
+	}
+	if p.current().IsWord("EQUAL") {
+		p.advance()
+		if !p.current().IsWord("TO") {
+			return 0, p.expected("TO after IS EQUAL")
+		}
+		p.advance()
+		return ast.CompareEqual, nil
+	}
+	if p.current().IsWord("GREATER") || p.current().IsWord("LESS") {
+		greater := p.current().IsWord("GREATER")
+		p.advance()
+		if !p.current().IsWord("THAN") {
+			return 0, p.expected("THAN in comparison")
+		}
+		p.advance()
+		if p.current().IsWord("OR") {
+			p.advance()
+			if !p.current().IsWord("EQUAL") {
+				return 0, p.expected("EQUAL after OR")
+			}
+			p.advance()
+			if !p.current().IsWord("TO") {
+				return 0, p.expected("TO after OR EQUAL")
+			}
+			p.advance()
+			if greater {
+				return ast.CompareGreaterEqual, nil
+			}
+			return ast.CompareLessEqual, nil
+		}
+		if greater {
+			return ast.CompareGreater, nil
+		}
+		return ast.CompareLess, nil
+	}
+	return 0, p.expected("comparison phrase after IS")
+}
 func (p *parser) parseExpression() (ast.Expression, error) {
 	t := p.current()
 	switch t.Kind {
@@ -248,7 +402,6 @@ func (p *parser) parseExpression() (ast.Expression, error) {
 		return nil, fmt.Errorf("%d:%d: expected expression, got %q", t.Line, t.Column, t.Lexeme)
 	}
 }
-
 func isLevelToken(t token.Token) bool {
 	if t.Kind != token.Number || strings.ContainsAny(t.Lexeme, "+-.eExXoObB") {
 		return false
@@ -259,7 +412,21 @@ func isLevelToken(t token.Token) bool {
 	}
 	return (n >= 1 && n <= 49) || n == 77
 }
-
+func (p *parser) isStatementStart() bool {
+	return p.current().IsWord("VAR") || p.current().IsWord("LET") || p.current().IsWord("DISPLAY") || p.current().IsWord("MOVE") || p.current().IsWord("IF")
+}
+func (p *parser) atBlockBoundary() bool {
+	return p.current().IsWord("ELSE") || p.current().IsWord("END-IF") || (p.current().IsWord("END") && p.peekWord(1, "IF"))
+}
+func (p *parser) peekWord(offset int, word string) bool {
+	idx := p.pos + offset
+	return idx < len(p.tokens) && p.tokens[idx].IsWord(word)
+}
+func (p *parser) consumeOptionalPeriod() {
+	if p.current().Kind == token.Period {
+		p.advance()
+	}
+}
 func (p *parser) requirePeriod(context string) error {
 	if p.current().Kind != token.Period {
 		return p.expected("'.' after " + context)
@@ -267,12 +434,10 @@ func (p *parser) requirePeriod(context string) error {
 	p.advance()
 	return nil
 }
-
 func (p *parser) expected(what string) error {
 	t := p.current()
 	return fmt.Errorf("%d:%d: expected %s, got %q", t.Line, t.Column, what, t.Lexeme)
 }
-
 func (p *parser) current() token.Token { return p.tokens[p.pos] }
 func (p *parser) atEnd() bool          { return p.current().Kind == token.EOF }
 func (p *parser) advance() token.Token {

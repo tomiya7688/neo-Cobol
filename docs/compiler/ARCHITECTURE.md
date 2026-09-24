@@ -16,7 +16,7 @@ Neo COBOL source
   -> lexer
   -> parser
   -> canonical AST
-  -> semantic analysis / symbol resolution
+  -> semantic analysis / scoped symbol resolution
   -> Neo IR (NIR)
   -> backend
   -> C11 (initial backend)
@@ -26,97 +26,53 @@ Neo COBOL source
 
 NIR is a required boundary. Backends must not depend directly on parser-specific syntax choices.
 
-## Repository layout
-
-```text
-cmd/neoc/             neoc CLI
-internal/lexer/       source -> tokens
-internal/parser/      tokens -> AST
-internal/ast/         canonical syntax tree
-internal/sema/        symbols, definite initialization, type/PIC validation
-internal/types/       canonical logical types and representation metadata
-internal/nir/         backend-independent Neo IR and lowering
-internal/backend/c/   initial C11 backend
-runtime/c/            shared C11 runtime boundary
-docs/language/        language specification
-docs/compiler/        implementation architecture and tooling docs
-examples/             executable examples
-tests/                cross-package fixtures / future conformance suites
-tools/                repository-local development tools
-```
-
-Language specification and implementation details are intentionally separated. `docs/language/` defines what Neo COBOL means; compiler packages define one implementation of those rules.
-
 ## Current executable scope
 
 The bootstrap compiler currently supports:
 
-- UTF-8 source input
-- case-insensitive keywords and identifiers
+- UTF-8 source input and case-insensitive keywords/identifiers
 - COBOL free-format `*>` comments
-- single- and double-quoted strings with doubled-quote escaping
-- decimal and explicit `0b` / `0o` / `0x` integer literals
-- optional `IDENTIFICATION DIVISION.`, `DATA DIVISION.`, and `PROCEDURE DIVISION.` headers
-- optional `WORKING-STORAGE SECTION.` header
-- `PROGRAM-ID.` metadata
 - elementary level-01 and level-77 declarations
-- canonical built-in `TYPE` names
-- initial `PIC X(...)`, `9(...)`, `S9(...)`, and implied-decimal `V` forms
-- PIC-only inference into `STRING`, `INTEGER`, `LONG`, or `DECIMAL`
-- `VALUE` with string, numeric, or Boolean literals
-- case-insensitive symbol resolution and duplicate-name diagnostics
-- definite-initialization checks for the implemented statement flow
-- static type compatibility checks and literal PIC-bound checks
-- `VAR name VALUE expression` mutable inferred local bindings
-- `LET name VALUE expression` non-reassignable inferred local bindings
-- inference from string, Boolean, INTEGER/LONG numeric, DECIMAL, or already-declared initialized values
-- `MOVE value TO variable`, including rejection of reassignment to `LET`
-- `DISPLAY` with literals and declared variables
-- NIR declaration operations that preserve the runtime position of local binding initializers
-- C11 emission
+- canonical built-in `TYPE` names and the initial `PIC` subset
+- `VALUE`, symbol resolution, definite initialization, and type/PIC validation
+- mutable inferred `VAR` and non-reassignable inferred `LET`
+- lexical local scopes and explicit shadowing of an outer binding
+- `MOVE` and `DISPLAY`
+- Boolean conditions
+- canonical English comparisons: `IS EQUAL TO`, `IS NOT EQUAL TO`, `IS GREATER THAN`, `IS LESS THAN`, and the `OR EQUAL TO` forms
+- logical `NOT`, `AND`, and `OR`, with `NOT` > `AND` > `OR` precedence
+- parenthesized conditions
+- `IF ... ELSE ... END-IF` and `END IF` shorthand
+- branch-aware definite-assignment merging
+- nested `IF` blocks
+- NIR condition/block lowering and C11 emission
 - `neoc check`, `emit-c`, `build`, `run`, and `version`
 
 Unsupported syntax fails explicitly. It must never be silently discarded or compiled as a no-op.
 
-## Types and PIC
+## Scope and flow model
 
-Logical type identity and storage/display representation are separate compiler concepts. `INTEGER`, `DECIMAL`, `STRING`, `BOOLEAN`, `FLOAT`, `BYTE`, `LONG`, and `DOUBLE` are canonical logical built-ins. `PIC` is represented as a compatible representation constraint attached to a logical type, not as the type itself.
+Traditional level-01/77 data items and the current top-level procedure bindings share the implemented source-unit scope. Each `IF` branch creates a lexical child scope. A binding declared inside a branch is not visible after `END-IF` or in the sibling branch.
 
-The semantic layer can validate the initial `DECIMAL`/PIC model, but exact decimal128 C11 lowering is intentionally not faked: the C backend currently reports `DECIMAL` as unsupported. The initial native backend can lower `STRING`, `BOOLEAN`, `BYTE`, `INTEGER`, and `LONG`; `FLOAT`/`DOUBLE` backend work remains incomplete.
+Definite assignment is flow-sensitive across `IF`. For an outer variable that was uninitialized before an `IF`, it is considered initialized after `END-IF` only when both the `THEN` and `ELSE` paths definitely initialize it. An `IF` without `ELSE` cannot make a previously uninitialized outer variable definitely initialized after the block.
 
-Fixed-width string and numeric PICs currently provide compile-time representation constraints for literal assignments. Full COBOL field padding/truncation and runtime PIC conversion semantics are not implemented yet.
+## Condition model
 
-`VAR` and `LET` infer one logical type from their initializer. Their declaration remains in NIR execution order instead of being hoisted, so an initializer observes values as they exist at the declaration point. `LET` immutability is enforced by semantic analysis rather than relying on backend-specific storage qualifiers.
+Neo COBOL does not use integer truthiness in the implemented condition subset. A value used directly as an `IF` condition must have logical type `BOOLEAN`.
 
-## Data-model and scope boundary
+Equality permits equal logical types and compatible numeric types. Ordered comparison is currently limited to numeric types. String equality lowers through `strcmp` in the C11 backend; string ordering is intentionally rejected until language semantics are specified.
 
-Only elementary level-01 and level-77 items are executable in the current slice. Levels 02-49 are recognized as level numbers but rejected until record hierarchy semantics are implemented. This avoids incorrectly flattening nested COBOL records.
+`DECIMAL` remains semantically recognized, but exact decimal128 C11 lowering is still intentionally unsupported rather than silently mapped to an imprecise C type.
 
-Traditional declarations must precede executable or procedure-local binding statements in the current source-unit implementation.
+## Data-model boundary
 
-The current executable slice has one procedure-local binding scope. The language specification defines `VAR` and `LET` as block-scoped; nested scopes and explicit shadowing behavior will be implemented with block statements such as `IF` and `PERFORM`, rather than pretending that a flat symbol table already provides full block-scope semantics.
-
-## Runtime boundary
-
-The bootstrap C backend lowers implemented `DISPLAY` behavior through portable C stdio. `runtime/c/` establishes the boundary for behavior that later needs shared runtime support. Backend-specific mechanics must not redefine language semantics.
-
-## CLI
-
-```text
-neoc check source.ncob
-neoc emit-c [-o file.c] source.ncob
-neoc build [-o executable] source.ncob
-neoc run source.ncob
-neoc version
-```
-
-`build` uses `$CC` when set; otherwise it searches `cc`, `clang`, then `gcc`.
+Only elementary level-01 and level-77 items are executable in the current slice. Levels 02-49 are recognized but rejected until record hierarchy semantics are implemented, avoiding accidental flattening of COBOL records.
 
 ## Next implementation slices
 
-1. Conditions, `IF`, and nested local scopes.
-2. Record hierarchy and additional traditional data-description entries.
-3. `OCCURS` and dynamic-array lowering.
+1. Record hierarchy and additional traditional data-description entries.
+2. `OCCURS` and dynamic-array lowering.
+3. Expanded `PERFORM` family and loops.
 4. Functions, classes, interfaces, inheritance, and closures.
 5. COBOL and Bitlang backends.
 6. Expanded runtime and backend-equivalence/conformance tests.

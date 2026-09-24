@@ -5,7 +5,6 @@ type Program struct {
 	Declarations []DataDeclaration
 	Statements   []Statement
 }
-
 type DataDeclaration struct {
 	Level       int
 	Name        string
@@ -13,9 +12,7 @@ type DataDeclaration struct {
 	Picture     string
 	Initializer Expression
 }
-
 type Statement interface{ statementNode() }
-
 type BindingDeclaration struct {
 	Name        string
 	Mutable     bool
@@ -35,8 +32,15 @@ type MoveStatement struct {
 
 func (MoveStatement) statementNode() {}
 
-type Expression interface{ expressionNode() }
+type IfStatement struct {
+	Condition Condition
+	Then      []Statement
+	Else      []Statement
+}
 
+func (IfStatement) statementNode() {}
+
+type Expression interface{ expressionNode() }
 type StringLiteral struct{ Value string }
 
 func (StringLiteral) expressionNode() {}
@@ -52,3 +56,46 @@ func (BooleanLiteral) expressionNode() {}
 type Identifier struct{ Name string }
 
 func (Identifier) expressionNode() {}
+
+type Condition interface{ conditionNode() }
+type ValueCondition struct{ Value Expression }
+
+func (ValueCondition) conditionNode() {}
+
+type ComparisonOperator uint8
+
+const (
+	CompareEqual ComparisonOperator = iota
+	CompareNotEqual
+	CompareGreater
+	CompareLess
+	CompareGreaterEqual
+	CompareLessEqual
+)
+
+type ComparisonCondition struct {
+	Left  Expression
+	Op    ComparisonOperator
+	Right Expression
+}
+
+func (ComparisonCondition) conditionNode() {}
+
+type LogicalOperator uint8
+
+const (
+	LogicalAnd LogicalOperator = iota
+	LogicalOr
+)
+
+type LogicalCondition struct {
+	Left  Condition
+	Op    LogicalOperator
+	Right Condition
+}
+
+func (LogicalCondition) conditionNode() {}
+
+type NotCondition struct{ Inner Condition }
+
+func (NotCondition) conditionNode() {}

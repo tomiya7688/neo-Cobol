@@ -34,3 +34,7 @@ jobs:
         run: |
           go run ./cmd/neoc build -o /tmp/neo-bindings examples/bindings.ncob
           test "$(/tmp/neo-bindings)" = $'SNAPSHOT=2\nVAR=3'
+      - name: Compile and run IF through C11 backend
+        run: |
+          go run ./cmd/neoc build -o /tmp/neo-if examples/if.ncob
+          test "$(/tmp/neo-if)" = $'ADULT\nDONE'
