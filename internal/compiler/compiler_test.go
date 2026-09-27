@@ -61,9 +61,9 @@ func TestPicLiteralConstraint(t *testing.T) {
 	}
 }
 
-func TestNestedLevelRejectedUntilRecordModelExists(t *testing.T) {
+func TestNestedLevelRequiresLevel01Parent(t *testing.T) {
 	_, err := EmitC(`05 CHILD TYPE INTEGER VALUE 1.`)
-	if err == nil || !strings.Contains(err.Error(), "record hierarchy support") {
+	if err == nil || !strings.Contains(err.Error(), "no level-01 parent") {
 		t.Fatalf("got error %v", err)
 	}
 }

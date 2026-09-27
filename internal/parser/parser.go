@@ -2,10 +2,11 @@ package parser
 
 import (
 	"fmt"
-	"github.com/tomiya7688/neo-Cobol/internal/ast"
-	"github.com/tomiya7688/neo-Cobol/internal/token"
 	"strconv"
 	"strings"
+
+	"github.com/tomiya7688/neo-Cobol/internal/ast"
+	"github.com/tomiya7688/neo-Cobol/internal/token"
 )
 
 type parser struct {
@@ -58,8 +59,14 @@ func Parse(tokens []token.Token) (*ast.Program, error) {
 			program.Statements = append(program.Statements, stmt)
 		}
 	}
+	tree, err := buildDataHierarchy(program.Declarations)
+	if err != nil {
+		return nil, err
+	}
+	program.Declarations = tree
 	return program, nil
 }
+
 func (p *parser) parseStatement() (ast.Statement, error) {
 	switch {
 	case p.current().IsWord("VAR"), p.current().IsWord("LET"):
@@ -75,6 +82,7 @@ func (p *parser) parseStatement() (ast.Statement, error) {
 		return nil, fmt.Errorf("%d:%d: unsupported statement starting at %q", t.Line, t.Column, t.Lexeme)
 	}
 }
+
 func (p *parser) parseDivisionHeader(name string) error {
 	p.advance()
 	if !p.current().IsWord("DIVISION") {
@@ -83,6 +91,7 @@ func (p *parser) parseDivisionHeader(name string) error {
 	p.advance()
 	return p.requirePeriod(name + " DIVISION")
 }
+
 func (p *parser) parseSectionHeader(name string) error {
 	p.advance()
 	if !p.current().IsWord("SECTION") {
@@ -91,6 +100,7 @@ func (p *parser) parseSectionHeader(name string) error {
 	p.advance()
 	return p.requirePeriod(name + " SECTION")
 }
+
 func (p *parser) parseProgramID(program *ast.Program) error {
 	p.advance()
 	if p.current().Kind != token.Period {
@@ -103,6 +113,7 @@ func (p *parser) parseProgramID(program *ast.Program) error {
 	program.Name = p.advance().Lexeme
 	return p.requirePeriod("program name")
 }
+
 func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 	levelToken := p.advance()
 	level, _ := strconv.Atoi(levelToken.Lexeme)
@@ -136,9 +147,6 @@ func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 			return decl, p.expected("picture after PIC")
 		}
 	}
-	if decl.TypeName == "" && decl.Picture == "" {
-		return decl, fmt.Errorf("%d:%d: data declaration %q requires TYPE or PIC", levelToken.Line, levelToken.Column, decl.Name)
-	}
 	if p.current().IsWord("VALUE") {
 		p.advance()
 		expr, err := p.parseExpression()
@@ -157,6 +165,49 @@ func (p *parser) parseDataDeclaration() (ast.DataDeclaration, error) {
 	}
 	return decl, nil
 }
+
+func buildDataHierarchy(flat []ast.DataDeclaration) ([]ast.DataDeclaration, error) {
+	var roots []ast.DataDeclaration
+	for i := 0; i < len(flat); {
+		if flat[i].Level != 1 && flat[i].Level != 77 {
+			return nil, fmt.Errorf("level %02d data item %q has no level-01 parent", flat[i].Level, flat[i].Name)
+		}
+		node, next, err := buildDataNode(flat, i)
+		if err != nil {
+			return nil, err
+		}
+		roots = append(roots, node)
+		i = next
+	}
+	return roots, nil
+}
+
+func buildDataNode(flat []ast.DataDeclaration, index int) (ast.DataDeclaration, int, error) {
+	node := flat[index]
+	next := index + 1
+	for next < len(flat) && flat[next].Level > node.Level {
+		child, after, err := buildDataNode(flat, next)
+		if err != nil {
+			return node, next, err
+		}
+		node.Children = append(node.Children, child)
+		next = after
+	}
+	if len(node.Children) > 0 {
+		if node.Level == 77 {
+			return node, next, fmt.Errorf("level 77 data item %q cannot contain subordinate items", node.Name)
+		}
+		if node.TypeName != "" || node.Picture != "" || node.Initializer != nil {
+			return node, next, fmt.Errorf("group item %q cannot also declare TYPE, PIC, or VALUE in the initial record model", node.Name)
+		}
+		return node, next, nil
+	}
+	if node.TypeName == "" && node.Picture == "" {
+		return node, next, fmt.Errorf("elementary data item %q requires TYPE or PIC", node.Name)
+	}
+	return node, next, nil
+}
+
 func (p *parser) parseBindingDeclaration() (ast.Statement, error) {
 	keyword := p.advance()
 	mutable := keyword.IsWord("VAR")
@@ -175,6 +226,7 @@ func (p *parser) parseBindingDeclaration() (ast.Statement, error) {
 	p.consumeOptionalPeriod()
 	return ast.BindingDeclaration{Name: name, Mutable: mutable, Initializer: initializer}, nil
 }
+
 func (p *parser) parseDisplay() (ast.Statement, error) {
 	p.advance()
 	stmt := ast.DisplayStatement{}
@@ -194,6 +246,7 @@ func (p *parser) parseDisplay() (ast.Statement, error) {
 	p.consumeOptionalPeriod()
 	return stmt, nil
 }
+
 func (p *parser) parseMove() (ast.Statement, error) {
 	p.advance()
 	source, err := p.parseExpression()
@@ -204,13 +257,14 @@ func (p *parser) parseMove() (ast.Statement, error) {
 		return nil, p.expected("TO in MOVE statement")
 	}
 	p.advance()
-	if p.current().Kind != token.Identifier {
-		return nil, p.expected("target identifier after TO")
+	target, err := p.parseDataReference()
+	if err != nil {
+		return nil, err
 	}
-	target := p.advance().Lexeme
 	p.consumeOptionalPeriod()
 	return ast.MoveStatement{Source: source, Target: target}, nil
 }
+
 func (p *parser) parseIf() (ast.Statement, error) {
 	p.advance()
 	condition, err := p.parseCondition()
@@ -240,6 +294,7 @@ func (p *parser) parseIf() (ast.Statement, error) {
 	p.consumeOptionalPeriod()
 	return ast.IfStatement{Condition: condition, Then: thenBlock, Else: elseBlock}, nil
 }
+
 func (p *parser) parseBlock(stopAtElse bool) ([]ast.Statement, error) {
 	var out []ast.Statement
 	for !p.atEnd() {
@@ -257,7 +312,9 @@ func (p *parser) parseBlock(stopAtElse bool) ([]ast.Statement, error) {
 	}
 	return nil, p.expected("END-IF")
 }
+
 func (p *parser) parseCondition() (ast.Condition, error) { return p.parseOrCondition() }
+
 func (p *parser) parseOrCondition() (ast.Condition, error) {
 	left, err := p.parseAndCondition()
 	if err != nil {
@@ -273,6 +330,7 @@ func (p *parser) parseOrCondition() (ast.Condition, error) {
 	}
 	return left, nil
 }
+
 func (p *parser) parseAndCondition() (ast.Condition, error) {
 	left, err := p.parseNotCondition()
 	if err != nil {
@@ -288,6 +346,7 @@ func (p *parser) parseAndCondition() (ast.Condition, error) {
 	}
 	return left, nil
 }
+
 func (p *parser) parseNotCondition() (ast.Condition, error) {
 	if p.current().IsWord("NOT") {
 		p.advance()
@@ -299,6 +358,7 @@ func (p *parser) parseNotCondition() (ast.Condition, error) {
 	}
 	return p.parsePredicateCondition()
 }
+
 func (p *parser) parsePredicateCondition() (ast.Condition, error) {
 	if p.current().Kind == token.LParen {
 		p.advance()
@@ -329,6 +389,7 @@ func (p *parser) parsePredicateCondition() (ast.Condition, error) {
 	}
 	return ast.ComparisonCondition{Left: left, Op: op, Right: right}, nil
 }
+
 func (p *parser) parseComparisonOperator() (ast.ComparisonOperator, error) {
 	p.advance()
 	if p.current().IsWord("NOT") {
@@ -380,6 +441,7 @@ func (p *parser) parseComparisonOperator() (ast.ComparisonOperator, error) {
 	}
 	return 0, p.expected("comparison phrase after IS")
 }
+
 func (p *parser) parseExpression() (ast.Expression, error) {
 	t := p.current()
 	switch t.Kind {
@@ -390,18 +452,35 @@ func (p *parser) parseExpression() (ast.Expression, error) {
 		p.advance()
 		return ast.NumberLiteral{Value: t.Lexeme}, nil
 	case token.Identifier:
-		p.advance()
 		if t.IsWord("TRUE") {
+			p.advance()
 			return ast.BooleanLiteral{Value: true}, nil
 		}
 		if t.IsWord("FALSE") {
+			p.advance()
 			return ast.BooleanLiteral{Value: false}, nil
 		}
-		return ast.Identifier{Name: t.Lexeme}, nil
+		return p.parseDataReference()
 	default:
 		return nil, fmt.Errorf("%d:%d: expected expression, got %q", t.Line, t.Column, t.Lexeme)
 	}
 }
+
+func (p *parser) parseDataReference() (ast.DataReference, error) {
+	if p.current().Kind != token.Identifier {
+		return ast.DataReference{}, p.expected("data name")
+	}
+	ref := ast.DataReference{Name: p.advance().Lexeme}
+	for p.current().IsWord("OF") {
+		p.advance()
+		if p.current().Kind != token.Identifier {
+			return ast.DataReference{}, p.expected("qualifier after OF")
+		}
+		ref.Qualifiers = append(ref.Qualifiers, p.advance().Lexeme)
+	}
+	return ref, nil
+}
+
 func isLevelToken(t token.Token) bool {
 	if t.Kind != token.Number || strings.ContainsAny(t.Lexeme, "+-.eExXoObB") {
 		return false
@@ -412,21 +491,26 @@ func isLevelToken(t token.Token) bool {
 	}
 	return (n >= 1 && n <= 49) || n == 77
 }
+
 func (p *parser) isStatementStart() bool {
 	return p.current().IsWord("VAR") || p.current().IsWord("LET") || p.current().IsWord("DISPLAY") || p.current().IsWord("MOVE") || p.current().IsWord("IF")
 }
+
 func (p *parser) atBlockBoundary() bool {
 	return p.current().IsWord("ELSE") || p.current().IsWord("END-IF") || (p.current().IsWord("END") && p.peekWord(1, "IF"))
 }
+
 func (p *parser) peekWord(offset int, word string) bool {
 	idx := p.pos + offset
 	return idx < len(p.tokens) && p.tokens[idx].IsWord(word)
 }
+
 func (p *parser) consumeOptionalPeriod() {
 	if p.current().Kind == token.Period {
 		p.advance()
 	}
 }
+
 func (p *parser) requirePeriod(context string) error {
 	if p.current().Kind != token.Period {
 		return p.expected("'.' after " + context)
@@ -434,12 +518,15 @@ func (p *parser) requirePeriod(context string) error {
 	p.advance()
 	return nil
 }
+
 func (p *parser) expected(what string) error {
 	t := p.current()
 	return fmt.Errorf("%d:%d: expected %s, got %q", t.Line, t.Column, what, t.Lexeme)
 }
+
 func (p *parser) current() token.Token { return p.tokens[p.pos] }
 func (p *parser) atEnd() bool          { return p.current().Kind == token.EOF }
+
 func (p *parser) advance() token.Token {
 	t := p.current()
 	if !p.atEnd() {

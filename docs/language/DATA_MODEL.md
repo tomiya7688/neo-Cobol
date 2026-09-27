@@ -29,6 +29,25 @@ A `STRUCT` is a value type. It has no class identity, inheritance, virtual dispa
 
 Traditional record layouts and `STRUCT` share the same aggregate field model internally. A compiler may normalize both to the same aggregate AST representation where their semantics are equivalent.
 
+### 1.1 Record field qualification
+
+A field may be referenced with COBOL-style `OF` qualification:
+
+```cobol
+DISPLAY ID OF CUSTOMER.
+MOVE 100 TO ID OF CUSTOMER.
+```
+
+Nested group qualification proceeds from the field outward:
+
+```cobol
+DISPLAY ZIP OF ADDRESS OF CUSTOMER.
+```
+
+An unqualified field name may be used only when it resolves to exactly one visible elementary data item. If two or more record fields share the same name, the unqualified form is a compile-time ambiguity and the source must use `OF` qualification.
+
+Group items define aggregate structure; they are not implicitly treated as scalar values. Whole-record assignment/copy semantics are specified separately from elementary field access.
+
 ## 2. Fixed-length arrays with OCCURS
 
 Neo COBOL keeps COBOL `OCCURS` for fixed-size arrays/tables.

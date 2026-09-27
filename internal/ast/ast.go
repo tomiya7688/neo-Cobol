@@ -5,14 +5,20 @@ type Program struct {
 	Declarations []DataDeclaration
 	Statements   []Statement
 }
+
 type DataDeclaration struct {
 	Level       int
 	Name        string
 	TypeName    string
 	Picture     string
 	Initializer Expression
+	Children    []DataDeclaration
 }
+
+func (d DataDeclaration) IsGroup() bool { return len(d.Children) > 0 }
+
 type Statement interface{ statementNode() }
+
 type BindingDeclaration struct {
 	Name        string
 	Mutable     bool
@@ -27,7 +33,7 @@ func (DisplayStatement) statementNode() {}
 
 type MoveStatement struct {
 	Source Expression
-	Target string
+	Target DataReference
 }
 
 func (MoveStatement) statementNode() {}
@@ -41,6 +47,7 @@ type IfStatement struct {
 func (IfStatement) statementNode() {}
 
 type Expression interface{ expressionNode() }
+
 type StringLiteral struct{ Value string }
 
 func (StringLiteral) expressionNode() {}
@@ -53,11 +60,15 @@ type BooleanLiteral struct{ Value bool }
 
 func (BooleanLiteral) expressionNode() {}
 
-type Identifier struct{ Name string }
+type DataReference struct {
+	Name       string
+	Qualifiers []string
+}
 
-func (Identifier) expressionNode() {}
+func (DataReference) expressionNode() {}
 
 type Condition interface{ conditionNode() }
+
 type ValueCondition struct{ Value Expression }
 
 func (ValueCondition) conditionNode() {}

@@ -38,3 +38,7 @@ jobs:
         run: |
           go run ./cmd/neoc build -o /tmp/neo-if examples/if.ncob
           test "$(/tmp/neo-if)" = $'ADULT\nDONE'
+      - name: Compile and run records through C11 backend
+        run: |
+          go run ./cmd/neoc build -o /tmp/neo-records examples/records.ncob
+          test "$(/tmp/neo-records)" = $'KADOKA 12345\nUPDATED'
