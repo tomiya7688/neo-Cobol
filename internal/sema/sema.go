@@ -18,8 +18,18 @@ type Symbol struct {
 }
 
 type Info struct {
-	Symbols map[string]Symbol
-	Globals map[string]string
+	Symbols   map[string]Symbol
+	Globals   map[string]string
+	Qualified map[string]string
+}
+
+func (i *Info) DataID(ref ast.DataReference) (string, bool) {
+	if len(ref.Qualifiers) == 0 {
+		id, ok := i.Globals[normalize(ref.Name)]
+		return id, ok
+	}
+	id, ok := i.Qualified[ReferenceKey(ref)]
+	return id, ok
 }
 
 type scope struct {
@@ -30,45 +40,111 @@ type scope struct {
 type flow map[string]bool
 
 type checker struct {
-	info   *Info
-	nextID int
+	info         *Info
+	nextID       int
+	dataNames    map[string][]string
+	allDataNames map[string]bool
 }
 
 func Check(program *ast.Program) (*Info, error) {
-	c := &checker{info: &Info{Symbols: make(map[string]Symbol), Globals: make(map[string]string)}}
-	dataScope := &scope{symbols: make(map[string]Symbol)}
+	c := &checker{
+		info: &Info{
+			Symbols:   make(map[string]Symbol),
+			Globals:   make(map[string]string),
+			Qualified: make(map[string]string),
+		},
+		dataNames:    make(map[string][]string),
+		allDataNames: make(map[string]bool),
+	}
 	state := make(flow)
-
+	rootNames := make(map[string]bool)
 	for _, decl := range program.Declarations {
-		if decl.Level != 1 && decl.Level != 77 {
-			return nil, fmt.Errorf("level %02d data item %q requires record hierarchy support, which is not implemented yet", decl.Level, decl.Name)
-		}
 		key := normalize(decl.Name)
-		if _, exists := dataScope.symbols[key]; exists {
-			return nil, fmt.Errorf("duplicate declaration of %q", decl.Name)
+		if rootNames[key] {
+			return nil, fmt.Errorf("duplicate top-level data declaration %q", decl.Name)
 		}
-		typeInfo, err := resolveDeclarationType(decl)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", decl.Name, err)
+		rootNames[key] = true
+		if err := c.registerData(decl, nil, state); err != nil {
+			return nil, err
 		}
-		id := "g:" + key
-		symbol := Symbol{ID: id, Name: decl.Name, Type: typeInfo, Mutable: true}
-		dataScope.symbols[key] = symbol
-		c.info.Symbols[id] = symbol
-		c.info.Globals[key] = id
-		state[id] = false
+	}
+	for name, ids := range c.dataNames {
+		if len(ids) == 1 {
+			c.info.Globals[name] = ids[0]
+		}
+	}
+
+	procedureScope := &scope{symbols: make(map[string]Symbol)}
+	if err := c.validateInitializersByPath(program.Declarations, nil, procedureScope, state); err != nil {
+		return nil, err
+	}
+	if _, err := c.checkStatements(procedureScope, state, program.Statements); err != nil {
+		return nil, err
+	}
+	return c.info, nil
+}
+
+func (c *checker) registerData(decl ast.DataDeclaration, ancestors []string, state flow) error {
+	key := normalize(decl.Name)
+	c.allDataNames[key] = true
+	path := append(append([]string{}, ancestors...), key)
+	if decl.IsGroup() {
+		for _, child := range decl.Children {
+			if err := c.registerData(child, path, state); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	typeInfo, err := resolveDeclarationType(decl)
+	if err != nil {
+		return fmt.Errorf("%s: %w", strings.Join(path, " OF "), err)
+	}
+	id := "d:" + strings.Join(path, "/")
+	if _, exists := c.info.Symbols[id]; exists {
+		return fmt.Errorf("duplicate data path for %q", decl.Name)
+	}
+	symbol := Symbol{ID: id, Name: decl.Name, Type: typeInfo, Mutable: true}
+	c.info.Symbols[id] = symbol
+	c.dataNames[key] = append(c.dataNames[key], id)
+	state[id] = false
+
+	if len(ancestors) > 0 {
+		qualifiers := make([]string, 0, len(ancestors))
+		for index := len(ancestors) - 1; index >= 0; index-- {
+			qualifiers = append(qualifiers, ancestors[index])
+		}
+		ref := ast.DataReference{Name: decl.Name, Qualifiers: qualifiers}
+		qkey := ReferenceKey(ref)
+		if _, exists := c.info.Qualified[qkey]; exists {
+			return fmt.Errorf("duplicate qualified data name %s", FormatReference(ref))
+		}
+		c.info.Qualified[qkey] = id
+	}
+	return nil
+}
+
+func (c *checker) validateInitializersByPath(decls []ast.DataDeclaration, ancestors []string, s *scope, state flow) error {
+	for _, decl := range decls {
+		key := normalize(decl.Name)
+		path := append(append([]string{}, ancestors...), key)
+		if decl.IsGroup() {
+			if err := c.validateInitializersByPath(decl.Children, path, s, state); err != nil {
+				return err
+			}
+			continue
+		}
+		id := "d:" + strings.Join(path, "/")
+		symbol := c.info.Symbols[id]
 		if decl.Initializer != nil {
-			if err := c.checkAssignmentValue(decl.Initializer, typeInfo, dataScope, state); err != nil {
-				return nil, fmt.Errorf("%s VALUE: %w", decl.Name, err)
+			if err := c.checkAssignmentValue(decl.Initializer, symbol.Type, s, state); err != nil {
+				return fmt.Errorf("%s VALUE: %w", strings.Join(path, " OF "), err)
 			}
 			state[id] = true
 		}
 	}
-
-	if _, err := c.checkStatements(dataScope, state, program.Statements); err != nil {
-		return nil, err
-	}
-	return c.info, nil
+	return nil
 }
 
 func (c *checker) checkStatements(s *scope, state flow, statements []ast.Statement) (flow, error) {
@@ -78,6 +154,9 @@ func (c *checker) checkStatements(s *scope, state flow, statements []ast.Stateme
 		case ast.BindingDeclaration:
 			key := normalize(stmt.Name)
 			if _, exists := s.symbols[key]; exists {
+				return nil, fmt.Errorf("duplicate declaration of %q in the same scope", stmt.Name)
+			}
+			if s.parent == nil && c.allDataNames[key] {
 				return nil, fmt.Errorf("duplicate declaration of %q in the same scope", stmt.Name)
 			}
 			kind, err := c.expressionType(stmt.Initializer, s, current, true)
@@ -90,24 +169,27 @@ func (c *checker) checkStatements(s *scope, state flow, statements []ast.Stateme
 			s.symbols[key] = symbol
 			c.info.Symbols[id] = symbol
 			current[id] = true
+
 		case ast.DisplayStatement:
 			for _, value := range stmt.Values {
 				if _, err := c.expressionType(value, s, current, true); err != nil {
 					return nil, err
 				}
 			}
+
 		case ast.MoveStatement:
-			target, ok := s.lookup(stmt.Target)
-			if !ok {
-				return nil, fmt.Errorf("MOVE target %q is not declared", stmt.Target)
+			target, err := c.resolveReference(stmt.Target, s)
+			if err != nil {
+				return nil, fmt.Errorf("MOVE target %s: %w", FormatReference(stmt.Target), err)
 			}
 			if !target.Mutable {
-				return nil, fmt.Errorf("MOVE target %q is a LET binding and cannot be reassigned", stmt.Target)
+				return nil, fmt.Errorf("MOVE target %q is a LET binding and cannot be reassigned", stmt.Target.Name)
 			}
 			if err := c.checkAssignmentValue(stmt.Source, target.Type, s, current); err != nil {
-				return nil, fmt.Errorf("MOVE to %s: %w", stmt.Target, err)
+				return nil, fmt.Errorf("MOVE to %s: %w", FormatReference(stmt.Target), err)
 			}
 			current[target.ID] = true
+
 		case ast.IfStatement:
 			if err := c.checkCondition(stmt.Condition, s, current); err != nil {
 				return nil, fmt.Errorf("IF condition: %w", err)
@@ -130,6 +212,7 @@ func (c *checker) checkStatements(s *scope, state flow, statements []ast.Stateme
 				merged[id] = thenFlow[id] && elseFlow[id]
 			}
 			current = merged
+
 		default:
 			return nil, fmt.Errorf("unsupported statement node %T", statement)
 		}
@@ -148,6 +231,7 @@ func (c *checker) checkCondition(condition ast.Condition, s *scope, state flow) 
 			return fmt.Errorf("condition must be BOOLEAN, got %s", kind)
 		}
 		return nil
+
 	case ast.ComparisonCondition:
 		left, err := c.expressionType(cond.Left, s, state, true)
 		if err != nil {
@@ -158,13 +242,16 @@ func (c *checker) checkCondition(condition ast.Condition, s *scope, state flow) 
 			return err
 		}
 		return checkComparisonTypes(cond.Op, left, right)
+
 	case ast.LogicalCondition:
 		if err := c.checkCondition(cond.Left, s, state); err != nil {
 			return err
 		}
 		return c.checkCondition(cond.Right, s, state)
+
 	case ast.NotCondition:
 		return c.checkCondition(cond.Inner, s, state)
+
 	default:
 		return fmt.Errorf("unsupported condition node %T", condition)
 	}
@@ -189,6 +276,62 @@ func isNumeric(kind types.Kind) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (c *checker) resolveReference(ref ast.DataReference, s *scope) (Symbol, error) {
+	if len(ref.Qualifiers) == 0 {
+		if symbol, ok := s.lookup(ref.Name); ok {
+			return symbol, nil
+		}
+		ids := c.dataNames[normalize(ref.Name)]
+		switch len(ids) {
+		case 0:
+			return Symbol{}, fmt.Errorf("is not declared")
+		case 1:
+			return c.info.Symbols[ids[0]], nil
+		default:
+			return Symbol{}, fmt.Errorf("is ambiguous; qualify it with OF")
+		}
+	}
+
+	id, ok := c.info.Qualified[ReferenceKey(ref)]
+	if !ok {
+		return Symbol{}, fmt.Errorf("is not declared with that qualification")
+	}
+	return c.info.Symbols[id], nil
+}
+
+func (c *checker) checkAssignmentValue(expr ast.Expression, target types.Type, s *scope, state flow) error {
+	sourceKind, err := c.expressionType(expr, s, state, true)
+	if err != nil {
+		return err
+	}
+	if !types.Assignable(sourceKind, target.Kind) && !literalFitsTarget(expr, target.Kind) {
+		return fmt.Errorf("cannot assign %s to %s", sourceKind, target.Kind)
+	}
+	return validatePictureLiteral(expr, target.Picture)
+}
+
+func (c *checker) expressionType(expr ast.Expression, s *scope, state flow, requireInitialized bool) (types.Kind, error) {
+	switch value := expr.(type) {
+	case ast.StringLiteral:
+		return types.String, nil
+	case ast.NumberLiteral:
+		return types.InferNumberLiteral(value.Value)
+	case ast.BooleanLiteral:
+		return types.Boolean, nil
+	case ast.DataReference:
+		symbol, err := c.resolveReference(value, s)
+		if err != nil {
+			return types.Invalid, fmt.Errorf("%s %w", FormatReference(value), err)
+		}
+		if requireInitialized && !state[symbol.ID] {
+			return types.Invalid, fmt.Errorf("%s is used before initialization", FormatReference(value))
+		}
+		return symbol.Type.Kind, nil
+	default:
+		return types.Invalid, fmt.Errorf("unsupported expression node %T", expr)
 	}
 }
 
@@ -240,39 +383,6 @@ func resolveDeclarationType(decl ast.DataDeclaration) (types.Type, error) {
 		return result, fmt.Errorf("declaration has no logical type")
 	}
 	return result, nil
-}
-
-func (c *checker) checkAssignmentValue(expr ast.Expression, target types.Type, s *scope, state flow) error {
-	sourceKind, err := c.expressionType(expr, s, state, true)
-	if err != nil {
-		return err
-	}
-	if !types.Assignable(sourceKind, target.Kind) && !literalFitsTarget(expr, target.Kind) {
-		return fmt.Errorf("cannot assign %s to %s", sourceKind, target.Kind)
-	}
-	return validatePictureLiteral(expr, target.Picture)
-}
-
-func (c *checker) expressionType(expr ast.Expression, s *scope, state flow, requireInitialized bool) (types.Kind, error) {
-	switch value := expr.(type) {
-	case ast.StringLiteral:
-		return types.String, nil
-	case ast.NumberLiteral:
-		return types.InferNumberLiteral(value.Value)
-	case ast.BooleanLiteral:
-		return types.Boolean, nil
-	case ast.Identifier:
-		symbol, ok := s.lookup(value.Name)
-		if !ok {
-			return types.Invalid, fmt.Errorf("identifier %q is not declared", value.Name)
-		}
-		if requireInitialized && !state[symbol.ID] {
-			return types.Invalid, fmt.Errorf("identifier %q is used before initialization", value.Name)
-		}
-		return symbol.Type.Kind, nil
-	default:
-		return types.Invalid, fmt.Errorf("unsupported expression node %T", expr)
-	}
 }
 
 func literalFitsTarget(expr ast.Expression, target types.Kind) bool {
@@ -334,6 +444,27 @@ func validatePictureLiteral(expr ast.Expression, pic *types.Picture) error {
 		}
 	}
 	return nil
+}
+
+func ReferenceKey(ref ast.DataReference) string {
+	parts := []string{normalize(ref.Name)}
+	for _, qualifier := range ref.Qualifiers {
+		parts = append(parts, normalize(qualifier))
+	}
+	return strings.Join(parts, "|")
+}
+
+func FormatReference(ref ast.DataReference) string {
+	if len(ref.Qualifiers) == 0 {
+		return ref.Name
+	}
+	var b strings.Builder
+	b.WriteString(ref.Name)
+	for _, qualifier := range ref.Qualifiers {
+		b.WriteString(" OF ")
+		b.WriteString(qualifier)
+	}
+	return b.String()
 }
 
 func normalize(name string) string { return strings.ToUpper(name) }

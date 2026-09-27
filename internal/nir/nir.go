@@ -12,14 +12,29 @@ import (
 type Program struct {
 	Name      string
 	Variables []Variable
+	Records   []Record
 	Ops       []Op
 }
+
 type Variable struct {
 	Name    string
 	Type    types.Type
 	Initial *Value
 	Mutable bool
 }
+
+type Record struct {
+	Name   string
+	Fields []Field
+}
+
+type Field struct {
+	Name     string
+	Type     *types.Type
+	Initial  *Value
+	Children []Field
+}
+
 type ValueKind uint8
 
 const (
@@ -32,7 +47,9 @@ type Value struct {
 	Type types.Kind
 	Text string
 }
+
 type Op interface{ opNode() }
+
 type Declare struct {
 	Name    string
 	Type    types.Type
@@ -62,6 +79,7 @@ type If struct {
 func (If) opNode() {}
 
 type Condition interface{ conditionNode() }
+
 type Truth struct{ Value Value }
 
 func (Truth) conditionNode() {}
@@ -108,33 +126,44 @@ type binding struct {
 	id  string
 	typ types.Type
 }
+
 type lowerScope struct {
 	parent   *lowerScope
 	bindings map[string]binding
+	info     *sema.Info
 }
+
 type lowerer struct{ nextID int }
 
 func Lower(program *ast.Program, info *sema.Info) (*Program, error) {
 	out := &Program{Name: program.Name}
-	root := &lowerScope{bindings: make(map[string]binding)}
+	root := &lowerScope{bindings: make(map[string]binding), info: info}
+
 	for _, decl := range program.Declarations {
-		key := normalize(decl.Name)
-		id := "g:" + key
+		if decl.IsGroup() {
+			record, err := lowerRecord(decl, nil, root)
+			if err != nil {
+				return nil, err
+			}
+			out.Records = append(out.Records, record)
+			continue
+		}
+		id := "d:" + normalize(decl.Name)
 		symbol, ok := info.Symbols[id]
 		if !ok {
 			return nil, fmt.Errorf("cannot lower unknown global %q", decl.Name)
 		}
-		v := Variable{Name: id, Type: symbol.Type, Mutable: true}
+		variable := Variable{Name: id, Type: symbol.Type, Mutable: true}
 		if decl.Initializer != nil {
 			value, err := lowerExpression(decl.Initializer, root)
 			if err != nil {
 				return nil, err
 			}
-			v.Initial = &value
+			variable.Initial = &value
 		}
-		out.Variables = append(out.Variables, v)
-		root.bindings[key] = binding{id: id, typ: symbol.Type}
+		out.Variables = append(out.Variables, variable)
 	}
+
 	l := &lowerer{}
 	ops, err := l.lowerBlock(program.Statements, root)
 	if err != nil {
@@ -143,6 +172,51 @@ func Lower(program *ast.Program, info *sema.Info) (*Program, error) {
 	out.Ops = ops
 	return out, nil
 }
+
+func lowerRecord(decl ast.DataDeclaration, ancestors []string, s *lowerScope) (Record, error) {
+	path := append(append([]string{}, ancestors...), normalize(decl.Name))
+	record := Record{Name: "r:" + strings.Join(path, "/")}
+	for _, child := range decl.Children {
+		field, err := lowerField(child, path, s)
+		if err != nil {
+			return Record{}, err
+		}
+		record.Fields = append(record.Fields, field)
+	}
+	return record, nil
+}
+
+func lowerField(decl ast.DataDeclaration, ancestors []string, s *lowerScope) (Field, error) {
+	path := append(append([]string{}, ancestors...), normalize(decl.Name))
+	if decl.IsGroup() {
+		field := Field{Name: "g:" + strings.Join(path, "/")}
+		for _, child := range decl.Children {
+			nested, err := lowerField(child, path, s)
+			if err != nil {
+				return Field{}, err
+			}
+			field.Children = append(field.Children, nested)
+		}
+		return field, nil
+	}
+
+	id := "d:" + strings.Join(path, "/")
+	symbol, ok := s.info.Symbols[id]
+	if !ok {
+		return Field{}, fmt.Errorf("cannot lower unknown data field %q", decl.Name)
+	}
+	typ := symbol.Type
+	field := Field{Name: id, Type: &typ}
+	if decl.Initializer != nil {
+		value, err := lowerExpression(decl.Initializer, s)
+		if err != nil {
+			return Field{}, err
+		}
+		field.Initial = &value
+	}
+	return field, nil
+}
+
 func (l *lowerer) lowerBlock(statements []ast.Statement, s *lowerScope) ([]Op, error) {
 	var out []Op
 	for _, statement := range statements {
@@ -157,6 +231,7 @@ func (l *lowerer) lowerBlock(statements []ast.Statement, s *lowerScope) ([]Op, e
 			typ := types.Type{Kind: value.Type}
 			out = append(out, Declare{Name: id, Type: typ, Initial: value, Mutable: stmt.Mutable})
 			s.bindings[normalize(stmt.Name)] = binding{id: id, typ: typ}
+
 		case ast.DisplayStatement:
 			op := Display{}
 			for _, expr := range stmt.Values {
@@ -167,38 +242,42 @@ func (l *lowerer) lowerBlock(statements []ast.Statement, s *lowerScope) ([]Op, e
 				op.Values = append(op.Values, value)
 			}
 			out = append(out, op)
+
 		case ast.MoveStatement:
-			target, ok := s.lookup(stmt.Target)
-			if !ok {
-				return nil, fmt.Errorf("cannot lower unknown MOVE target %q", stmt.Target)
+			target, err := resolveReference(stmt.Target, s)
+			if err != nil {
+				return nil, err
 			}
 			value, err := lowerExpression(stmt.Source, s)
 			if err != nil {
 				return nil, err
 			}
 			out = append(out, Move{Source: value, Target: target.id})
+
 		case ast.IfStatement:
 			condition, err := lowerCondition(stmt.Condition, s)
 			if err != nil {
 				return nil, err
 			}
-			thenScope := &lowerScope{parent: s, bindings: make(map[string]binding)}
+			thenScope := &lowerScope{parent: s, bindings: make(map[string]binding), info: s.info}
 			thenOps, err := l.lowerBlock(stmt.Then, thenScope)
 			if err != nil {
 				return nil, err
 			}
-			elseScope := &lowerScope{parent: s, bindings: make(map[string]binding)}
+			elseScope := &lowerScope{parent: s, bindings: make(map[string]binding), info: s.info}
 			elseOps, err := l.lowerBlock(stmt.Else, elseScope)
 			if err != nil {
 				return nil, err
 			}
 			out = append(out, If{Condition: condition, Then: thenOps, Else: elseOps})
+
 		default:
 			return nil, fmt.Errorf("cannot lower statement node %T", statement)
 		}
 	}
 	return out, nil
 }
+
 func lowerCondition(condition ast.Condition, s *lowerScope) (Condition, error) {
 	switch cond := condition.(type) {
 	case ast.ValueCondition:
@@ -241,6 +320,7 @@ func lowerCondition(condition ast.Condition, s *lowerScope) (Condition, error) {
 		return nil, fmt.Errorf("cannot lower condition node %T", condition)
 	}
 }
+
 func mapCompare(op ast.ComparisonOperator) ComparisonOperator {
 	switch op {
 	case ast.CompareEqual:
@@ -259,6 +339,7 @@ func mapCompare(op ast.ComparisonOperator) ComparisonOperator {
 		return CompareEqual
 	}
 }
+
 func lowerExpression(expr ast.Expression, s *lowerScope) (Value, error) {
 	switch value := expr.(type) {
 	case ast.StringLiteral:
@@ -275,17 +356,32 @@ func lowerExpression(expr ast.Expression, s *lowerScope) (Value, error) {
 			return Value{}, err
 		}
 		return Value{Kind: LiteralValue, Type: kind, Text: value.Value}, nil
-	case ast.Identifier:
-		symbol, ok := s.lookup(value.Name)
-		if !ok {
-			return Value{}, fmt.Errorf("cannot lower unknown identifier %q", value.Name)
+	case ast.DataReference:
+		resolved, err := resolveReference(value, s)
+		if err != nil {
+			return Value{}, err
 		}
-		return Value{Kind: VariableValue, Type: symbol.typ.Kind, Text: symbol.id}, nil
+		return Value{Kind: VariableValue, Type: resolved.typ.Kind, Text: resolved.id}, nil
 	default:
 		return Value{}, fmt.Errorf("cannot lower expression node %T", expr)
 	}
 }
-func (s *lowerScope) lookup(name string) (binding, bool) {
+
+func resolveReference(ref ast.DataReference, s *lowerScope) (binding, error) {
+	if len(ref.Qualifiers) == 0 {
+		if local, ok := s.lookupLocal(ref.Name); ok {
+			return local, nil
+		}
+	}
+	id, ok := s.info.DataID(ref)
+	if !ok {
+		return binding{}, fmt.Errorf("cannot lower unresolved reference %s", sema.FormatReference(ref))
+	}
+	symbol := s.info.Symbols[id]
+	return binding{id: id, typ: symbol.Type}, nil
+}
+
+func (s *lowerScope) lookupLocal(name string) (binding, bool) {
 	key := normalize(name)
 	for current := s; current != nil; current = current.parent {
 		if b, ok := current.bindings[key]; ok {
@@ -294,4 +390,5 @@ func (s *lowerScope) lookup(name string) (binding, bool) {
 	}
 	return binding{}, false
 }
+
 func normalize(name string) string { return strings.ToUpper(name) }
