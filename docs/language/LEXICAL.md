@@ -161,7 +161,21 @@ An omitted terminator is a parser-context boundary, not a whitespace rule. It is
 - the first token of another statement recognized by the grammar;
 - a block marker such as `ELSE`, `END-IF`, or `END-PERFORM` that is valid at that point.
 
-A line break or indentation change alone never ends a statement. For example, the two lines in `DISPLAY FIRST-VALUE\nSECOND-VALUE.` are still one `DISPLAY` statement with two operands.
+A line break or indentation change alone never ends a statement. The statement keyword, not the line break, makes this boundary unambiguous:
+
+```cobol
+MOVE SOURCE TO TARGET
+DISPLAY "DONE"
+```
+
+Conversely, a line break does not split a `DISPLAY` operand list:
+
+```cobol
+DISPLAY FIRST-VALUE
+SECOND-VALUE.
+```
+
+This is one `DISPLAY` statement with two operands.
 
 The period remains required after division and section headers, `PROGRAM-ID` declarations, and data declarations. If a statement boundary cannot be determined from the grammar, the source is invalid; the parser must not guess or silently change meaning.
 
