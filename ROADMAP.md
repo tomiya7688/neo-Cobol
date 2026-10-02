@@ -6,7 +6,7 @@ Neo COBOL is currently in the language-design phase. The roadmap intentionally e
 
 - [x] Initialize repository documentation.
 - [x] Add MIT license.
-- [ ] Confirm language philosophy and design principles.
+- [x] Confirm language philosophy and design principles.
 - [ ] Define contribution and coding conventions when implementation begins.
 
 ## Phase 1 — Language core
