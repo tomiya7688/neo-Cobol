@@ -151,12 +151,33 @@ They are case-insensitive keywords.
 A period (`.`) is the canonical sentence terminator.
 
 ```ebnf
-sentence-terminator = [ "." ] ;
+period = "." ;
+sentence-terminator = period | omitted-statement-boundary ;
 ```
 
-A period may be omitted only when the parser can determine the statement boundary unambiguously from block structure, line structure, end of file, or another explicit syntactic boundary.
+An omitted terminator is a parser-context boundary, not a whitespace rule. It is permitted only after a complete executable statement or local `VAR`/`LET` binding whose grammar allows omission, and only when the next token is unambiguous:
 
-Omitting a period must never silently change the meaning of a valid program.
+- end of file after a complete statement;
+- the first token of another statement recognized by the grammar;
+- a block marker such as `ELSE`, `END-IF`, or `END-PERFORM` that is valid at that point.
+
+A line break or indentation change alone never ends a statement. The statement keyword, not the line break, makes this boundary unambiguous:
+
+```cobol
+MOVE SOURCE TO TARGET
+DISPLAY "DONE"
+```
+
+Conversely, a line break does not split a `DISPLAY` operand list:
+
+```cobol
+DISPLAY FIRST-VALUE
+SECOND-VALUE.
+```
+
+This is one `DISPLAY` statement with two operands.
+
+The period remains required after division and section headers, `PROGRAM-ID` declarations, and traditional level-number data descriptions. A local `VAR` or `LET` binding may omit its period where its grammar permits. If a statement boundary cannot be determined from the grammar, the source is invalid; the parser must not guess or silently change meaning.
 
 ## 8. Reserved words
 
