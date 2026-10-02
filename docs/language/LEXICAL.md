@@ -158,9 +158,20 @@ A period may be omitted only when the parser can determine the statement boundar
 
 Omitting a period must never silently change the meaning of a valid program.
 
-## 8. Open items
+## 8. Reserved words
 
-- Reserved-word set
+Reserved words are case-insensitive and cannot be used as identifiers, regardless of capitalization. This initial set covers words used by language forms described in the current drafts, including forms whose detailed grammar remains open. Words mentioned only under Open items are not reserved until their syntax is specified.
+
+- Program structure: `DATA`, `DIVISION`, `IDENTIFICATION`, `PROGRAM-ID`, `PROCEDURE`, `SECTION`, `WORKING-STORAGE`.
+- Data declarations and types: `BOOLEAN`, `BYTE`, `DECIMAL`, `DEPENDING`, `DOUBLE`, `FLOAT`, `INTEGER`, `LONG`, `NULL`, `NULLABLE`, `OCCURS`, `PIC`, `SEQUENCE`, `STRUCT`, `STRING`, `TYPE`, `VALUE`.
+- Statements and conditions: `ADD`, `AND`, `AS`, `CALL`, `COMPUTE`, `CONVERT`, `CREATE`, `DESTROY`, `DISPLAY`, `ELSE`, `END`, `END-CLASS`, `END-IF`, `END-PERFORM`, `EQUAL`, `ERROR`, `EXCEPTION`, `GREATER`, `IF`, `IS`, `LAST`, `LENGTH`, `LESS`, `MOVE`, `NOT`, `OF`, `ON`, `OR`, `PERFORM`, `REMOVE`, `RESIZE`, `THAN`, `TO`.
+- Functions, parameters, classes, and namespaces: `ABSTRACT`, `BY`, `CLASS`, `CLASS-ID`, `END CLASS`, `END FUNCTION`, `END INTERFACE`, `END METHOD`, `END NAMESPACE`, `FALSE`, `FUNCTION`, `IMPLEMENTS`, `INHERITS`, `INITIALIZE`, `INTERFACE`, `LET`, `METHOD`, `METHOD-ID`, `NAMESPACE`, `OPTIONAL`, `OVERRIDE`, `PRIVATE`, `PROTECTED`, `PUBLIC`, `REFERENCE`, `RETURN`, `RETURNING`, `SEALED`, `STATIC`, `TRUE`, `USE`, `USING`, `VAR`.
+
+Multiword forms such as `END IF`, `END PERFORM`, `END CLASS`, and `END FUNCTION` are sequences of reserved words. Where a hyphenated spelling is defined, it is one reserved token: `PROGRAM-ID`, `WORKING-STORAGE`, `CLASS-ID`, `METHOD-ID`, `END-CLASS`, `END-IF`, or `END-PERFORM`. Spaced and hyphenated block terminators accepted for the same construct normalize identically.
+
+## 9. Open items
+
+- Reserved words for syntax whose grammar is still open
 - Maximum identifier length
 - Unicode identifier policy
 - Exact period-omission boundary rules
