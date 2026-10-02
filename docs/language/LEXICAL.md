@@ -155,7 +155,7 @@ period = "." ;
 sentence-terminator = period | omitted-statement-boundary ;
 ```
 
-An omitted terminator is a parser-context boundary, not a whitespace rule. It is permitted only after a complete executable statement whose grammar allows omission, and only when the next token is unambiguous:
+An omitted terminator is a parser-context boundary, not a whitespace rule. It is permitted only after a complete executable statement or local `VAR`/`LET` binding whose grammar allows omission, and only when the next token is unambiguous:
 
 - end of file after a complete statement;
 - the first token of another statement recognized by the grammar;
@@ -177,7 +177,7 @@ SECOND-VALUE.
 
 This is one `DISPLAY` statement with two operands.
 
-The period remains required after division and section headers, `PROGRAM-ID` declarations, and data declarations. If a statement boundary cannot be determined from the grammar, the source is invalid; the parser must not guess or silently change meaning.
+The period remains required after division and section headers, `PROGRAM-ID` declarations, and traditional level-number data descriptions. A local `VAR` or `LET` binding may omit its period where its grammar permits. If a statement boundary cannot be determined from the grammar, the source is invalid; the parser must not guess or silently change meaning.
 
 ## 8. Reserved words
 
