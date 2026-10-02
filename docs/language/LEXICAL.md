@@ -158,7 +158,18 @@ A period may be omitted only when the parser can determine the statement boundar
 
 Omitting a period must never silently change the meaning of a valid program.
 
-## 8. Open items
+## 8. Reserved words
+
+Reserved words are case-insensitive and cannot be used as identifiers, regardless of capitalization. This initial set covers syntax whose core spelling is defined in the current draft. Words mentioned only as future or open items are not reserved until their syntax is specified.
+
+- Program structure: `DATA`, `DIVISION`, `IDENTIFICATION`, `PROGRAM-ID`, `PROCEDURE`, `SECTION`, `WORKING-STORAGE`.
+- Data declarations and types: `BOOLEAN`, `BYTE`, `DECIMAL`, `DOUBLE`, `FLOAT`, `INTEGER`, `LONG`, `NULL`, `NULLABLE`, `OCCURS`, `PIC`, `SEQUENCE`, `STRUCT`, `STRING`, `TYPE`, `VALUE`.
+- Statements and conditions: `AND`, `AS`, `CONVERT`, `CREATE`, `DESTROY`, `DISPLAY`, `ELSE`, `END`, `END-IF`, `END-PERFORM`, `EQUAL`, `ERROR`, `EXCEPTION`, `GREATER`, `IF`, `IS`, `LAST`, `LENGTH`, `LESS`, `MOVE`, `NOT`, `OF`, `ON`, `OR`, `PERFORM`, `REMOVE`, `RESIZE`, `THAN`, `TO`.
+- Functions, parameters, classes, and namespaces: `ABSTRACT`, `BY`, `CLASS`, `CLASS-ID`, `END CLASS`, `END FUNCTION`, `END INTERFACE`, `END METHOD`, `END NAMESPACE`, `FALSE`, `FUNCTION`, `IMPLEMENTS`, `INHERITS`, `INITIALIZE`, `INTERFACE`, `LET`, `METHOD`, `METHOD-ID`, `NAMESPACE`, `OPTIONAL`, `OVERRIDE`, `PRIVATE`, `PROTECTED`, `PUBLIC`, `REFERENCE`, `RETURN`, `RETURNING`, `SEALED`, `STATIC`, `TRUE`, `USE`, `USING`, `VAR`.
+
+Multiword forms such as `END IF`, `END PERFORM`, `END CLASS`, and `END FUNCTION` are sequences of reserved words. Where a hyphenated spelling is defined, it is one reserved token: `PROGRAM-ID`, `WORKING-STORAGE`, `CLASS-ID`, `METHOD-ID`, `END-IF`, or `END-PERFORM`. The spaced and hyphenated block terminators that are specified as equivalent normalize to the same construct.
+
+## 9. Open items
 
 - Reserved-word set
 - Maximum identifier length
