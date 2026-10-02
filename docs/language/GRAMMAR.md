@@ -54,10 +54,11 @@ Omitted program divisions are reconstructed according to `PROGRAM_STRUCTURE.md`.
 ```ebnf
 qualified-name = identifier, { ".", identifier } ;
 
-sentence-terminator = [ "." ] ;
+period = "." ;
+sentence-terminator = period | omitted-statement-boundary ;
 ```
 
-Exact lexical details are normative in `LEXICAL.md`.
+`omitted-statement-boundary` is determined from parser context, as defined in `LEXICAL.md`; a newline alone is not a terminator. Grammar productions for division/section headers, `PROGRAM-ID`, and data declarations require `period`. Only productions that permit omission may use `sentence-terminator`.
 
 ## 5. Shared block normalization
 
