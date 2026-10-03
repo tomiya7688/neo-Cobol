@@ -202,7 +202,7 @@ Multiword forms such as `END IF`, `END PERFORM`, `END CLASS`, and `END FUNCTION`
 - Reserved words for syntax whose grammar is still open
 - Maximum identifier length
 - Unicode identifier policy
-- Exact period-omission boundary rules
+- Statement-specific period-omission rules for syntax whose grammar remains open
 - Digit separators
 - Locale-dependent numeric conventions
 - Legacy COBOL literal edge cases
