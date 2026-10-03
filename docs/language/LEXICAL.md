@@ -67,6 +67,8 @@ identifier-end = letter | digit ;
 
 The alternatives allow digit-leading identifiers only when they contain a letter, and require every multi-character identifier to end with a letter or digit. The grammar therefore rejects identifiers made only of digits or ending in a hyphen or underscore.
 
+In this draft, `letter` means ASCII `A`–`Z` or `a`–`z`, and `digit` means `0`–`9`. The policy for non-ASCII identifier characters remains open.
+
 ## 3. Comments
 
 Neo COBOL uses the free-format COBOL comment marker `*>`.
