@@ -37,6 +37,8 @@ customer_name
 CUSTOMER-01
 GET_CUSTOMER-NAME
 A1
+1A
+123-CUSTOMER
 ```
 
 Invalid examples:
@@ -49,20 +51,21 @@ CUSTOMER_
 12345
 ```
 
-Preliminary EBNF:
+EBNF:
 
 ```ebnf
-identifier = identifier-start,
-             { identifier-middle },
-             identifier-end
-           | letter ;
+identifier = letter
+           | letter, { identifier-middle }, identifier-end
+           | digit, { identifier-prefix-continuation }, letter
+           | digit, { identifier-prefix-continuation }, letter,
+             { identifier-middle }, identifier-end ;
 
-identifier-start = letter | digit ;
+identifier-prefix-continuation = digit | "-" | "_" ;
 identifier-middle = letter | digit | "-" | "_" ;
 identifier-end = letter | digit ;
 ```
 
-The complete identifier must additionally contain at least one letter.
+The alternatives allow digit-leading identifiers only when they contain a letter, and require every multi-character identifier to end with a letter or digit. The grammar therefore rejects identifiers made only of digits or ending in a hyphen or underscore.
 
 ## 3. Comments
 
@@ -131,6 +134,8 @@ Neo COBOL also supports explicit based integer notation:
 ```
 
 The radix prefix is case-insensitive.
+
+When a digit-leading source span could match both a numeric literal and an identifier, the lexer selects the longest complete match; a numeric literal wins a tie. For example, `1E3` is a number and `123ABC` is an identifier. A leading `+` or `-` belongs to a signed numeric literal and never starts an identifier.
 
 ## 6. Boolean and null literals
 
