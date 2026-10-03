@@ -80,7 +80,7 @@ The grammar is still a working draft. A feature described as decided in the focu
 ## 7. Major remaining grammar work
 
 - Full reserved-word set
-- Exact period-omission boundaries
+- Statement-specific period-omission rules for syntax whose grammar remains open
 - Full `PIC` and data-description grammar
 - Numeric/storage type rules
 - Complete `COMPUTE`
