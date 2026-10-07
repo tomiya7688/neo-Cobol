@@ -46,7 +46,15 @@ When existing COBOL syntax already expresses the intended concept, Neo COBOL ext
 
 A proposed syntax feature should normally be rejected or redesigned when it makes valid source code substantially harder to read as an English description of program intent without providing a compelling technical benefit.
 
-This does not require grammatically perfect English. Compiler determinism, compatibility, unambiguous grammar, and implementation safety take precedence where natural phrasing would introduce ambiguity.
+Review a syntax proposal against these questions:
+
+1. Can a reader identify the operation and its target from the words and layout without translating dense symbolic notation?
+2. Does an existing COBOL construct already express the same concept clearly? If so, what technical need justifies another form?
+3. When multiple spellings express the same meaning, is the COBOL-like or full-English spelling the preferred form?
+4. Can the accepted form be parsed deterministically, without contextual guesswork?
+5. Does the proposal preserve the stated compatibility rules, or clearly document its native-only behavior and lowering limits?
+
+A proposal should include a representative example and explain any answer that weakens one of these criteria. This does not require grammatically perfect English. Compiler determinism, compatibility, unambiguous grammar, and implementation safety take precedence where natural phrasing would introduce ambiguity.
 
 ## 5. Compatibility model
 
