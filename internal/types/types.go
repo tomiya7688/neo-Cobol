@@ -186,7 +186,7 @@ func CompatiblePicture(kind Kind, pic *Picture) bool {
 	}
 }
 
-func InferNumberLiteral(literal string) (Kind, error) {
+// {\n//   責務: [\n//     ParseIntegerLiteral: 言語仕様に従って整数リテラルを解析する\n//   ]\n//   処理: [\n//     1: 明示的な基数prefixがあれば基数を選ぶ\n//     2: prefixなしは10進数として符号付き64 bit整数へ変換する\n//   ]\n//   引数: [\n//     literal: 解析する整数リテラル\n//   ]\n//   戻り値: [\n//     value: 解析した整数\n//     error: 不正な桁またはLONG範囲外の場合のエラー\n//   ]\n// }\nfunc ParseIntegerLiteral(literal string) (int64, error) {\n\tif literal == "" {\n\t\treturn 0, fmt.Errorf("empty integer literal")\n\t}\n\n\tsign := ""\n\tunsigned := literal\n\tif unsigned[0] == '+' || unsigned[0] == '-' {\n\t\tsign = unsigned[:1]\n\t\tunsigned = unsigned[1:]\n\t}\n\n\tbase := 10\n\tif len(unsigned) >= 2 && unsigned[0] == '0' {\n\t\tswitch unsigned[1] {\n\t\tcase 'b', 'B':\n\t\t\tbase = 2\n\t\tcase 'o', 'O':\n\t\t\tbase = 8\n\t\tcase 'x', 'X':\n\t\t\tbase = 16\n\t\t}\n\t\tif base != 10 {\n\t\t\tunsigned = unsigned[2:]\n\t\t}\n\t}\n\n\treturn strconv.ParseInt(sign+unsigned, base, 64)\n}\n\nfunc InferNumberLiteral(literal string) (Kind, error) {
 	unsigned := strings.TrimPrefix(strings.TrimPrefix(literal, "+"), "-")
 	isBased := strings.HasPrefix(unsigned, "0x") || strings.HasPrefix(unsigned, "0X") ||
 		strings.HasPrefix(unsigned, "0b") || strings.HasPrefix(unsigned, "0B") ||
@@ -194,9 +194,13 @@ func InferNumberLiteral(literal string) (Kind, error) {
 	if !isBased && strings.ContainsAny(literal, ".eE") {
 		return Decimal, nil
 	}
-	v, err := strconv.ParseInt(literal, 0, 64)
+	v, err := ParseIntegerLiteral(literal)
 	if err != nil {
-		return Invalid, fmt.Errorf("integer literal %q is outside LONG range", literal)
+		var numericError *strconv.NumError
+		if errors.As(err, &numericError) && numericError.Err == strconv.ErrRange {
+			return Invalid, fmt.Errorf("integer literal %q is outside LONG range", literal)
+		}
+		return Invalid, fmt.Errorf("invalid integer literal %q: %w", literal, err)
 	}
 	if v >= -2147483648 && v <= 2147483647 {
 		return Integer, nil
