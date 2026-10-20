@@ -7,14 +7,14 @@ import (
 )
 
 // {
- //   責務: [
- //     TestParseIntegerLiteral: 明示prefixと先頭ゼロを含む整数の値を検証する
- //   ]
- //   処理: [
- //     1: 10進数と2進・8進・16進の入力を解析する
- //     2: 境界値を含む解析結果を期待値と比較する
- //   ]
- // }
+//   責務: [
+//     TestParseIntegerLiteral: 明示prefixと先頭ゼロを含む整数の値を検証する
+//   ]
+//   処理: [
+//     1: 10進数と2進・8進・16進の入力を解析する
+//     2: 境界値を含む解析結果を期待値と比較する
+//   ]
+// }
 func TestParseIntegerLiteral(t *testing.T) {
 	cases := []struct {
 		literal string
@@ -50,14 +50,14 @@ func TestParseIntegerLiteral(t *testing.T) {
 }
 
 // {
- //   責務: [
- //     TestParseIntegerLiteralDistinguishesInvalidDigitsAndOverflow: 不正な桁と範囲外を区別する
- //   ]
- //   処理: [
- //     1: 不正な桁とLONG範囲外の入力を解析する
- //     2: strconvのsyntax errorとrange errorを比較する
- //   ]
- // }
+//   責務: [
+//     TestParseIntegerLiteralDistinguishesInvalidDigitsAndOverflow: 不正な桁と範囲外を区別する
+//   ]
+//   処理: [
+//     1: 不正な桁とLONG範囲外の入力を解析する
+//     2: strconvのsyntax errorとrange errorを比較する
+//   ]
+// }
 func TestParseIntegerLiteralDistinguishesInvalidDigitsAndOverflow(t *testing.T) {
 	cases := []struct {
 		literal string
@@ -80,14 +80,14 @@ func TestParseIntegerLiteralDistinguishesInvalidDigitsAndOverflow(t *testing.T) 
 }
 
 // {
- //   責務: [
- //     TestInferNumberLiteralUsesDecimalUnlessBasePrefixIsExplicit: 整数型推論の基数規則を検証する
- //   ]
- //   処理: [
- //     1: 先頭ゼロ付き10進数と明示8進数を推論する
- //     2: 推論結果を期待する整数型と比較する
- //   ]
- // }
+//   責務: [
+//     TestInferNumberLiteralUsesDecimalUnlessBasePrefixIsExplicit: 整数型推論の基数規則を検証する
+//   ]
+//   処理: [
+//     1: 先頭ゼロ付き10進数と明示8進数を推論する
+//     2: 推論結果を期待する整数型と比較する
+//   ]
+// }
 func TestInferNumberLiteralUsesDecimalUnlessBasePrefixIsExplicit(t *testing.T) {
 	cases := []struct {
 		literal string
