@@ -186,7 +186,52 @@ func CompatiblePicture(kind Kind, pic *Picture) bool {
 	}
 }
 
-// {\n//   責務: [\n//     ParseIntegerLiteral: 言語仕様に従って整数リテラルを解析する\n//   ]\n//   処理: [\n//     1: 明示的な基数prefixがあれば基数を選ぶ\n//     2: prefixなしは10進数として符号付き64 bit整数へ変換する\n//   ]\n//   引数: [\n//     literal: 解析する整数リテラル\n//   ]\n//   戻り値: [\n//     value: 解析した整数\n//     error: 不正な桁またはLONG範囲外の場合のエラー\n//   ]\n// }\nfunc ParseIntegerLiteral(literal string) (int64, error) {\n\tif literal == "" {\n\t\treturn 0, fmt.Errorf("empty integer literal")\n\t}\n\n\tsign := ""\n\tunsigned := literal\n\tif unsigned[0] == '+' || unsigned[0] == '-' {\n\t\tsign = unsigned[:1]\n\t\tunsigned = unsigned[1:]\n\t}\n\n\tbase := 10\n\tif len(unsigned) >= 2 && unsigned[0] == '0' {\n\t\tswitch unsigned[1] {\n\t\tcase 'b', 'B':\n\t\t\tbase = 2\n\t\tcase 'o', 'O':\n\t\t\tbase = 8\n\t\tcase 'x', 'X':\n\t\t\tbase = 16\n\t\t}\n\t\tif base != 10 {\n\t\t\tunsigned = unsigned[2:]\n\t\t}\n\t}\n\n\treturn strconv.ParseInt(sign+unsigned, base, 64)\n}\n\nfunc InferNumberLiteral(literal string) (Kind, error) {
+// {
+//   責務: [
+//     ParseIntegerLiteral: 言語仕様に従って整数リテラルを解析する
+//   ]
+//   処理: [
+//     1: 明示的な基数prefixがあれば基数を選ぶ
+//     2: prefixなしは10進数として符号付き64 bit整数へ変換する
+//   ]
+//   引数: [
+//     literal: 解析する整数リテラル
+//   ]
+//   戻り値: [
+//     value: 解析した整数
+//     error: 不正な桁またはLONG範囲外の場合のエラー
+//   ]
+// }
+func ParseIntegerLiteral(literal string) (int64, error) {
+	if literal == "" {
+		return 0, fmt.Errorf("empty integer literal")
+	}
+
+	sign := ""
+	unsigned := literal
+	if unsigned[0] == '+' || unsigned[0] == '-' {
+		sign = unsigned[:1]
+		unsigned = unsigned[1:]
+	}
+
+	base := 10
+	if len(unsigned) >= 2 && unsigned[0] == '0' {
+		switch unsigned[1] {
+		case 'b', 'B':
+			base = 2
+		case 'o', 'O':
+			base = 8
+		case 'x', 'X':
+			base = 16
+		}
+		if base != 10 {
+			unsigned = unsigned[2:]
+		}
+	}
+
+	return strconv.ParseInt(sign+unsigned, base, 64)
+}
+func InferNumberLiteral(literal string) (Kind, error) {
 	unsigned := strings.TrimPrefix(strings.TrimPrefix(literal, "+"), "-")
 	isBased := strings.HasPrefix(unsigned, "0x") || strings.HasPrefix(unsigned, "0X") ||
 		strings.HasPrefix(unsigned, "0b") || strings.HasPrefix(unsigned, "0B") ||
