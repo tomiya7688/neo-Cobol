@@ -2,7 +2,6 @@ package sema
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
