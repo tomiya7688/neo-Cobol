@@ -232,6 +232,7 @@ func ParseIntegerLiteral(literal string) (int64, error) {
 
 	return strconv.ParseInt(sign+unsigned, base, 64)
 }
+
 func InferNumberLiteral(literal string) (Kind, error) {
 	unsigned := strings.TrimPrefix(strings.TrimPrefix(literal, "+"), "-")
 	isBased := strings.HasPrefix(unsigned, "0x") || strings.HasPrefix(unsigned, "0X") ||
