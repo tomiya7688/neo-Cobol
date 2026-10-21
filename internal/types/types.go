@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -186,6 +187,52 @@ func CompatiblePicture(kind Kind, pic *Picture) bool {
 	}
 }
 
+// {
+//   責務: [
+//     ParseIntegerLiteral: 言語仕様に従って整数リテラルを解析する
+//   ]
+//   処理: [
+//     1: 明示的な基数prefixがあれば基数を選ぶ
+//     2: prefixなしは10進数として符号付き64 bit整数へ変換する
+//   ]
+//   引数: [
+//     literal: 解析する整数リテラル
+//   ]
+//   戻り値: [
+//     value: 解析した整数
+//     error: 不正な桁またはLONG範囲外の場合のエラー
+//   ]
+// }
+func ParseIntegerLiteral(literal string) (int64, error) {
+	if literal == "" {
+		return 0, fmt.Errorf("empty integer literal")
+	}
+
+	sign := ""
+	unsigned := literal
+	if unsigned[0] == '+' || unsigned[0] == '-' {
+		sign = unsigned[:1]
+		unsigned = unsigned[1:]
+	}
+
+	base := 10
+	if len(unsigned) >= 2 && unsigned[0] == '0' {
+		switch unsigned[1] {
+		case 'b', 'B':
+			base = 2
+		case 'o', 'O':
+			base = 8
+		case 'x', 'X':
+			base = 16
+		}
+		if base != 10 {
+			unsigned = unsigned[2:]
+		}
+	}
+
+	return strconv.ParseInt(sign+unsigned, base, 64)
+}
+
 func InferNumberLiteral(literal string) (Kind, error) {
 	unsigned := strings.TrimPrefix(strings.TrimPrefix(literal, "+"), "-")
 	isBased := strings.HasPrefix(unsigned, "0x") || strings.HasPrefix(unsigned, "0X") ||
@@ -194,9 +241,13 @@ func InferNumberLiteral(literal string) (Kind, error) {
 	if !isBased && strings.ContainsAny(literal, ".eE") {
 		return Decimal, nil
 	}
-	v, err := strconv.ParseInt(literal, 0, 64)
+	v, err := ParseIntegerLiteral(literal)
 	if err != nil {
-		return Invalid, fmt.Errorf("integer literal %q is outside LONG range", literal)
+		var numericError *strconv.NumError
+		if errors.As(err, &numericError) && numericError.Err == strconv.ErrRange {
+			return Invalid, fmt.Errorf("integer literal %q is outside LONG range", literal)
+		}
+		return Invalid, fmt.Errorf("invalid integer literal %q: %w", literal, err)
 	}
 	if v >= -2147483648 && v <= 2147483647 {
 		return Integer, nil

@@ -297,7 +297,7 @@ func emitValue(value nir.Value, cNames map[string]string) (string, error) {
 		}
 		return "false", nil
 	case types.Byte, types.Integer, types.Long:
-		parsed, err := strconv.ParseInt(value.Text, 0, 64)
+		parsed, err := types.ParseIntegerLiteral(value.Text)
 		if err != nil {
 			return "", fmt.Errorf("invalid integer literal %q: %w", value.Text, err)
 		}

@@ -2,7 +2,6 @@ package sema
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -390,7 +389,7 @@ func literalFitsTarget(expr ast.Expression, target types.Kind) bool {
 	if !ok {
 		return false
 	}
-	value, err := strconv.ParseInt(number.Value, 0, 64)
+	value, err := types.ParseIntegerLiteral(number.Value)
 	if err != nil {
 		return target == types.Decimal && strings.ContainsAny(number.Value, ".eE")
 	}
