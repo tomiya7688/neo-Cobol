@@ -151,19 +151,50 @@ They are case-insensitive keywords.
 A period (`.`) is the canonical sentence terminator.
 
 ```ebnf
-sentence-terminator = [ "." ] ;
+period = "." ;
+sentence-terminator = period | omitted-statement-boundary ;
 ```
 
-A period may be omitted only when the parser can determine the statement boundary unambiguously from block structure, line structure, end of file, or another explicit syntactic boundary.
+An omitted terminator is a parser-context boundary, not a whitespace rule. It is permitted only after a complete executable statement or local `VAR`/`LET` binding whose grammar allows omission, and only when the next token is unambiguous:
 
-Omitting a period must never silently change the meaning of a valid program.
+- end of file after a complete statement;
+- the first token of another statement recognized by the grammar;
+- a block marker such as `ELSE`, `END-IF`, or `END-PERFORM` that is valid at that point.
 
-## 8. Open items
+A line break or indentation change alone never ends a statement. The statement keyword, not the line break, makes this boundary unambiguous:
 
-- Reserved-word set
+```cobol
+MOVE SOURCE TO TARGET
+DISPLAY "DONE"
+```
+
+Conversely, a line break does not split a `DISPLAY` operand list:
+
+```cobol
+DISPLAY FIRST-VALUE
+SECOND-VALUE.
+```
+
+This is one `DISPLAY` statement with two operands.
+
+The period remains required after division and section headers, `PROGRAM-ID` declarations, and traditional level-number data descriptions. A local `VAR` or `LET` binding may omit its period where its grammar permits. If a statement boundary cannot be determined from the grammar, the source is invalid; the parser must not guess or silently change meaning.
+
+## 8. Reserved words
+
+Reserved words are case-insensitive and cannot be used as identifiers, regardless of capitalization. This initial set covers words used by language forms described in the current drafts, including forms whose detailed grammar remains open. Words mentioned only under Open items are not reserved until their syntax is specified.
+
+- Program structure: `DATA`, `DIVISION`, `IDENTIFICATION`, `PROGRAM-ID`, `PROCEDURE`, `SECTION`, `WORKING-STORAGE`.
+- Data declarations and types: `BOOLEAN`, `BYTE`, `DECIMAL`, `DEPENDING`, `DOUBLE`, `FLOAT`, `INTEGER`, `LONG`, `NULL`, `NULLABLE`, `OCCURS`, `PIC`, `SEQUENCE`, `STRUCT`, `STRING`, `TYPE`, `VALUE`.
+- Statements and conditions: `ADD`, `AND`, `AS`, `CALL`, `COMPUTE`, `CONVERT`, `CREATE`, `DESTROY`, `DISPLAY`, `ELSE`, `END`, `END-CLASS`, `END-IF`, `END-PERFORM`, `EQUAL`, `ERROR`, `EXCEPTION`, `GREATER`, `IF`, `IS`, `LAST`, `LENGTH`, `LESS`, `MOVE`, `NOT`, `OF`, `ON`, `OR`, `PERFORM`, `REMOVE`, `RESIZE`, `THAN`, `TO`.
+- Functions, parameters, classes, and namespaces: `ABSTRACT`, `BY`, `CLASS`, `CLASS-ID`, `FALSE`, `FUNCTION`, `IMPLEMENTS`, `INHERITS`, `INITIALIZE`, `INTERFACE`, `LET`, `METHOD`, `METHOD-ID`, `NAMESPACE`, `OPTIONAL`, `OVERRIDE`, `PRIVATE`, `PROTECTED`, `PUBLIC`, `REFERENCE`, `RETURN`, `RETURNING`, `SEALED`, `STATIC`, `TRUE`, `USE`, `USING`, `VAR`.
+
+Multiword forms such as `END IF`, `END PERFORM`, `END CLASS`, and `END FUNCTION` are sequences of reserved words. Where a hyphenated spelling is defined, it is one reserved token: `PROGRAM-ID`, `WORKING-STORAGE`, `CLASS-ID`, `METHOD-ID`, `END-CLASS`, `END-IF`, or `END-PERFORM`. Spaced and hyphenated block terminators accepted for the same construct normalize identically.
+
+## 9. Open items
+
+- Reserved words for syntax whose grammar is still open
 - Maximum identifier length
 - Unicode identifier policy
-- Exact period-omission boundary rules
 - Digit separators
 - Locale-dependent numeric conventions
 - Legacy COBOL literal edge cases
